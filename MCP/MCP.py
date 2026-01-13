@@ -1154,6 +1154,7 @@ def boolean_operation(design,ui,op):
 
 
 def sweep(design,ui):
+    try:
         rootComp = design.rootComponent
         sketches = rootComp.sketches
         sweeps = rootComp.features.sweepFeatures
@@ -1164,18 +1165,36 @@ def sweep(design,ui):
                 ui.messageBox("Sweep requires at least 2 sketches (profile and path). Please create sketches first.")
             return
 
-        profsketch = sketches.item(sketches.count - 2)  # Letzter Sketch
-        prof = profsketch.profiles.item(0) # Letztes Profil im Sketch also der Kreis
-        pathsketch = sketches.item(sketches.count - 1) # take the last sketch as path
+        profsketch = sketches.item(sketches.count - 2)  # Profile sketch
+        
+        # Check if profile sketch has profiles
+        if profsketch.profiles.count == 0:
+            if ui:
+                ui.messageBox("Profile sketch has no closed profiles. Please draw a closed shape for the profile.")
+            return
+        
+        prof = profsketch.profiles.item(0)  # First profile in the sketch
+        
+        pathsketch = sketches.item(sketches.count - 1)  # Path sketch
+        
+        # Check if path sketch has curves
+        if pathsketch.sketchCurves.count == 0:
+            if ui:
+                ui.messageBox("Path sketch has no curves. Please draw a path for the sweep.")
+            return
+        
         # collect all sketch curves in an ObjectCollection
         pathCurves = adsk.core.ObjectCollection.create()
         for i in range(pathsketch.sketchCurves.count):
             pathCurves.add(pathsketch.sketchCurves.item(i))
 
-    
-        path = adsk.fusion.Path.create(pathCurves, 0) # connec
+        path = adsk.fusion.Path.create(pathCurves, 0)
         sweepInput = sweeps.createInput(prof, path, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         sweeps.add(sweepInput)
+    except:
+        if ui:
+            ui.messageBox('Failed sweep:\n{}'.format(traceback.format_exc()))
+
 
 
 def extrude_last_sketch(design, ui, value,taperangle):
