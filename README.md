@@ -12,6 +12,7 @@ Fusion MCP Integration bridges AI assistants with Autodesk Fusion 360 through th
 - 🤖 **AI-Driven Automation** - Automate repetitive modeling tasks
 - 🔧 **Parametric Control** - Dynamically modify design parameters
 - 🎓 **Accessible CAD** - Lower the barrier for non-CAD users
+- 🎨 **Complex Models** - Create prop replicas, custom enclosures, and functional designs
 
 > **Note:** This is designed as an assistive tool and educational project, not a replacement for professional CAD workflows.
 > Projects like this can assist people with no experience in CAD workflows.
