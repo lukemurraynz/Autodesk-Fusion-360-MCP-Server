@@ -536,7 +536,8 @@ def move_last_body(design,ui,x,y,z):
                 latest_body = body.item(body.count - 1)
                 bodies.add(latest_body)
         else:
-            ui.messageBox("Keine Bodies gefunden.")
+            if ui:
+                ui.messageBox("Keine Bodies gefunden.")
             return
 
         vector = adsk.core.Vector3D.create(x,y,z)
@@ -545,6 +546,11 @@ def move_last_body(design,ui,x,y,z):
         moveFeatureInput = moveFeats.createInput2(bodies)
         moveFeatureInput.defineAsFreeMove(transform)
         moveFeats.add(moveFeatureInput)
+    except RuntimeError as e:
+        # Handle specific RuntimeErrors like "invalid transform"
+        error_msg = str(e)
+        if ui:
+            ui.messageBox('Failed to move the body:\n{}'.format(error_msg))
     except:
         if ui:
             ui.messageBox('Failed to move the body:\n{}'.format(traceback.format_exc()))
@@ -689,7 +695,7 @@ def sketch_on_face(design, ui, body_index, face_index):
         # Create sketch on the face
         sketch = sketches.add(face)
         
-        ui.messageBox(f"Sketch created on face {face_index} of body {body_index}")
+        # Success - no notification needed (only show failures)
         
     except:
         if ui:
@@ -1075,10 +1081,7 @@ def spline(design, ui, points, plane="XY"):
         
         sketch.sketchCurves.sketchFittedSplines.add(splinePoints)
         
-        # Check if the sketch has closed profiles (informational warning)
-        if sketch.profiles.count == 0:
-            if ui:
-                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
+        # Note: Splines can be open or closed - no warning needed
     except:
         if ui:
             ui.messageBox('Failed draw_spline:\n{}'.format(traceback.format_exc()))
@@ -1117,10 +1120,7 @@ def arc(design,ui,point1,point2,points3,plane = "XY",connect = False):
         else:
             lines = sketch.sketchCurves.sketchLines
         
-        # Check if the sketch has closed profiles (informational warning)
-        if sketch.profiles.count == 0:
-            if ui:
-                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
+        # Note: Arcs can be open or closed - no warning needed
 
     except:
         if ui:
@@ -1183,10 +1183,7 @@ def draw_one_line(design, ui, x1, y1, z1, x2, y2, z2, plane="XY"):
         end = adsk.core.Point3D.create(x2, y2, 0)
         sketch.sketchCurves.sketchLines.addByTwoPoints(start, end)
         
-        # Check if the sketch has closed profiles after adding the line (informational warning)
-        if sketch.profiles.count == 0:
-            if ui:
-                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
+        # Note: Lines can be open or closed - no warning needed
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
@@ -1412,6 +1409,12 @@ def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
         # Ausführen
         shellFeats.add(shellInput)
 
+    except RuntimeError as e:
+        # Log RuntimeError without UI popup (e.g., "Shell compute failed", "no lump left")
+        if ui:
+            error_msg = str(e)
+            # Only show UI popup for failures - this logs the error
+            ui.messageBox('Failed:\n{}'.format(error_msg))
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
@@ -1714,9 +1717,8 @@ def export_as_STEP(design, ui,Name):
         
         
         res = exportMgr.execute(stepOptions)
-        if res:
-            ui.messageBox(f"Exported STEP to: {Export_dir_path}")
-        else:
+        if not res:
+            # Only show message on failure
             ui.messageBox("STEP export failed")
     except:
         if ui:
@@ -1903,7 +1905,7 @@ def export_as_STL(design, ui,Name):
             
             exportMgr.execute(stlExportOptions)
             
-        ui.messageBox(f"Exported STL to: {Export_dir_path}")
+        # Success - no notification needed (only show failures)
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))

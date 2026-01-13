@@ -19,6 +19,8 @@ Fusion MCP Integration bridges AI assistants with Autodesk Fusion 360 through th
 
 > **Goal:** Enable conversational CAD and AI-driven automation in Fusion.
 
+> **⚠️ Important:** See [Known Limitations](./KNOWN_LIMITATIONS.md) for workflow constraints and best practices.
+
 ---
 
 
@@ -314,6 +316,13 @@ The Fusion 360 API is **not thread-safe** and requires all operations to run on 
 2. **Task Queue** - Queue operations for sequential execution
 3. **Async Bridge** - HTTP server handles async MCP requests
 
+### Known Limitations
+The integration has some workflow constraints due to Fusion API behavior:
+- Face topology changes after boolean operations (pockets, cuts)
+- Sketch re-creation limitations on same faces
+- Timing constraints for rapid-fire operations
+
+**See [Known Limitations](./KNOWN_LIMITATIONS.md) for details and workarounds.**
    
 ## Security Considerations 🔒
 - Local execution → safe by default
