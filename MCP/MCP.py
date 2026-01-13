@@ -962,7 +962,7 @@ def spline(design, ui, points, plane="XY"):
         
         sketch.sketchCurves.sketchFittedSplines.add(splinePoints)
         
-        # Check if the sketch has closed profiles
+        # Check if the sketch has closed profiles (informational warning)
         if sketch.profiles.count == 0:
             if ui:
                 ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
@@ -1004,7 +1004,7 @@ def arc(design,ui,point1,point2,points3,plane = "XY",connect = False):
         else:
             lines = sketch.sketchCurves.sketchLines
         
-        # Check if the sketch has closed profiles
+        # Check if the sketch has closed profiles (informational warning)
         if sketch.profiles.count == 0:
             if ui:
                 ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
@@ -1070,7 +1070,7 @@ def draw_one_line(design, ui, x1, y1, z1, x2, y2, z2, plane="XY"):
         end = adsk.core.Point3D.create(x2, y2, 0)
         sketch.sketchCurves.sketchLines.addByTwoPoints(start, end)
         
-        # Check if the sketch has closed profiles after adding the line
+        # Check if the sketch has closed profiles after adding the line (informational warning)
         if sketch.profiles.count == 0:
             if ui:
                 ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
