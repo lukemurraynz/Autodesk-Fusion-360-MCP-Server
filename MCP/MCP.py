@@ -728,11 +728,15 @@ def draw_polygon(design, ui, sides, radius, x, y, z, plane="XY"):
             px = radius * math.cos(angle)
             py = radius * math.sin(angle)
             
+            # Create vertices in sketch coordinate system (third parameter is always 0)
             if plane == "XZ":
-                vertices.append(adsk.core.Point3D.create(x + px, z + py, 0))
+                # XZ plane: X and Z are in-plane, Y is perpendicular
+                vertices.append(adsk.core.Point3D.create(x + px, 0, z + py))
             elif plane == "YZ":
-                vertices.append(adsk.core.Point3D.create(y + px, z + py, 0))
+                # YZ plane: Y and Z are in-plane, X is perpendicular
+                vertices.append(adsk.core.Point3D.create(0, y + px, z + py))
             else:  # XY
+                # XY plane: X and Y are in-plane, Z is perpendicular
                 vertices.append(adsk.core.Point3D.create(x + px, y + py, 0))
         
         # Draw lines connecting vertices
@@ -835,9 +839,15 @@ def mirror_feature(design, ui, mirror_plane, body_index=None):
             ui.messageBox('Failed mirror_feature:\n{}'.format(traceback.format_exc()))
 
 
-def offsetplane(design,ui,offset,plane ="XY"):
+def offsetplane(design, ui, offset, plane="XY"):
     """
-    Creates a new offset sketch which can be selected
+    Creates a new offset construction plane which can be selected.
+    
+    :param design: The Fusion 360 design object
+    :param ui: The Fusion 360 user interface object
+    :param offset: Distance to offset the plane (in cm)
+    :param plane: Base plane to offset from ('XY', 'XZ', or 'YZ')
+    :return: None
     """
     try:
         rootComp = design.rootComponent
