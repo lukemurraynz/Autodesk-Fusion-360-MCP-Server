@@ -515,6 +515,11 @@ def pocket_recess(design, ui, depth, face_index=None):
         sketches = rootComp.sketches
         bodies = rootComp.bRepBodies
         
+        # Check if there are any bodies to cut into
+        if bodies.count == 0:
+            ui.messageBox("No target body found to cut or intersect! Please create a body first before using pocket_recess.")
+            return
+        
         # Get the last sketch
         if sketches.count == 0:
             ui.messageBox("No sketch found. Please create a sketch first.")
@@ -1522,6 +1527,13 @@ def cut_extrude(design,ui,depth):
     try:
         rootComp = design.rootComponent 
         sketches = rootComp.sketches
+        bodies = rootComp.bRepBodies
+        
+        # Check if there are any bodies to cut into
+        if bodies.count == 0:
+            if ui:
+                ui.messageBox("No target body found to cut or intersect! Please create a body first before using cut_extrude.")
+            return
         
         # Check if there are any sketches
         if sketches.count == 0:
