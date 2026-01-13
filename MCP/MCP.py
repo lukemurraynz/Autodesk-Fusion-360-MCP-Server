@@ -509,7 +509,6 @@ def pocket_recess(design, ui, depth, face_index=None):
     """
     Creates a pocket/recess by cutting the last sketch into a body.
     This is essentially a cut extrude with better control for creating pockets.
-    If face_index is specified, it will create the sketch on that face first.
     """
     try:
         rootComp = design.rootComponent
@@ -522,6 +521,12 @@ def pocket_recess(design, ui, depth, face_index=None):
             return
             
         sketch = sketches.item(sketches.count - 1)
+        
+        # Check if sketch has profiles
+        if sketch.profiles.count == 0:
+            ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
+            return
+            
         prof = sketch.profiles.item(0)
         
         # Create cut extrude
@@ -688,7 +693,6 @@ def draw_polygon(design, ui, sides, radius, x, y, z, plane="XY"):
                 sketch = sketches.add(offsetPlane)
             else:
                 sketch = sketches.add(basePlane)
-            centerPoint = adsk.core.Point3D.create(x, z, 0)
             
         elif plane == "YZ":
             basePlane = rootComp.yZConstructionPlane
@@ -700,7 +704,6 @@ def draw_polygon(design, ui, sides, radius, x, y, z, plane="XY"):
                 sketch = sketches.add(offsetPlane)
             else:
                 sketch = sketches.add(basePlane)
-            centerPoint = adsk.core.Point3D.create(y, z, 0)
             
         else:  # XY plane (default)
             basePlane = rootComp.xYConstructionPlane
@@ -712,7 +715,6 @@ def draw_polygon(design, ui, sides, radius, x, y, z, plane="XY"):
                 sketch = sketches.add(offsetPlane)
             else:
                 sketch = sketches.add(basePlane)
-            centerPoint = adsk.core.Point3D.create(x, y, 0)
         
         # Create polygon using circumscribed circle method
         lines = sketch.sketchCurves.sketchLines
@@ -834,8 +836,7 @@ def mirror_feature(design, ui, mirror_plane, body_index=None):
 
 
 def offsetplane(design,ui,offset,plane ="XY"):
-
-    """,
+    """
     Creates a new offset sketch which can be selected
     """
     try:
