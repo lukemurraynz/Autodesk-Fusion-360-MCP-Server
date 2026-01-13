@@ -956,6 +956,11 @@ def spline(design, ui, points, plane="XY"):
             splinePoints.add(adsk.core.Point3D.create(point[0], point[1], point[2]))
         
         sketch.sketchCurves.sketchFittedSplines.add(splinePoints)
+        
+        # Check if the sketch has closed profiles
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
     except:
         if ui:
             ui.messageBox('Failed draw_spline:\n{}'.format(traceback.format_exc()))
