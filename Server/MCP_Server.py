@@ -60,6 +60,9 @@ mcp = FastMCP("Fusion",
                 - Never attempt to sketch on shelled bodies
                 - Never pocket into curved interior faces
                 - Order: Create solid → Apply features/pockets → Shell (if needed) → Fillet
+                - CRITICAL: Shell operations can only be applied ONCE per body
+                - Use check_shell_status(body_id) to verify body hasn't been shelled already
+                - If shell fails with "already shelled" error, use undo() or delete_all()
 
                 **Explicit Feature Targeting (REQUIRED):**
                 - pocket_recess(depth, body_id=0, sketch_id=2) - specify exact targets
@@ -548,17 +551,66 @@ def draw_box(height_value:str, width_value:str, depth_value:str, x_value:float, 
 @mcp.tool()
 def shell_body(thickness: float, faceindex: int):
     """
-    Du kannst die Dicke der Wand als Float übergeben
-    Du kannst den Faceindex als Integer übergeben
-    WEnn du davor eine Box abgerundet hast muss die im klaren sein, dass du 20 neue Flächen hast.
-    Die sind alle die kleinen abgerundeten
-    Falls du eine Box davor die Ecken verrundet hast,
-    dann ist der Facinedex der großen Flächen mindestens 21
-    Es kann immer nur der letzte Body geschält werde
+    Hollows out a body, leaving a uniform wall thickness.
 
-    :param thickness:
-    :param faceindex:
-    :return:
+    CRITICAL: This operation can only be performed ONCE per body. Attempting to shell
+    an already-shelled body will fail with error "ASM_LOP_HOL_MULTI_SHELL".
+
+    THICKNESS GUIDELINES (CRITICAL!):
+    - START SMALL: Use 0.1-0.15 cm (1-1.5mm) as default
+    - Maximum safe: ~5% of smallest body dimension
+    - Error "ASM_RBI_NO_LUMP_LEFT" = thickness is TOO LARGE
+    - Too-thick walls remove all material - nothing left to shell!
+    - REDUCE THICKNESS if any error occurs
+
+    BEST PRACTICES:
+    1. Apply ALL pockets, recesses, and features BEFORE shelling
+    2. Never sketch on shelled bodies
+    3. Shell should be one of the last operations in your workflow
+    4. Use check_shell_status() to verify body hasn't been shelled already
+    5. Start with small thickness (0.1 cm) and increase gradually
+
+    :param thickness: Wall thickness in cm
+        - 0.1 cm = 1mm (RECOMMENDED STARTING POINT)
+        - 0.15 cm = 1.5mm (thin walls)
+        - 0.2 cm = 2mm (medium walls)
+        - 0.3 cm = 3mm (only for larger bodies)
+        - ERROR? Reduce to 0.1 cm and try again
+    :param faceindex: Index of face to remove (opens the body at that face)
+        - Simple box: 0-5 are the six faces
+        - After filleting: face indices change significantly
+        - Try different faces (0, 1, 2, 3, 4, 5) if one fails
+        - Use list_faces() to see all available faces
+
+    :return: {"success": true/false, "message": "...", "error": "..."}
+
+    Example:
+    ```python
+    # Check if safe to shell
+    status = check_shell_status(body_id=0)
+    if status["has_shell"]:
+        undo()  # Remove previous shell
+
+    # Build body with features first
+    draw_box(10, 10, 5, 0, 0, 0, "XY")
+    sketch_on_face(body_index=0, face_index=4)
+    draw_circle(radius=2, x=0, y=0, z=0)
+    pocket_recess(depth=1.0, body_id=0)
+
+    # Shell with SMALL thickness first
+    result = shell_body(thickness=0.1, faceindex=0)  # 1mm walls - safe start
+
+    if not result.get("success"):
+        error_msg = result.get("message", "").lower()
+        if "lump" in error_msg or "meaningful" in error_msg:
+            # Thickness too large - try smaller
+            undo()
+            shell_body(thickness=0.08, faceindex=0)  # Try even smaller
+        elif "face" in error_msg:
+            # Wrong face index - try different
+            undo()
+            shell_body(thickness=0.1, faceindex=1)  # Try next face
+    ```
     """
     try:
         headers = config.HEADERS
@@ -567,9 +619,16 @@ def shell_body(thickness: float, faceindex: int):
             "thickness": thickness,
             "faceindex": faceindex
         }
-        return send_request(endpoint, data, headers)
+        result = send_request(endpoint, data, headers)
+
+        # Check if result indicates failure
+        if isinstance(result, dict) and not result.get("success", True):
+            logging.warning("Shell body operation failed or was skipped: %s", result.get("message"))
+
+        return result
     except requests.RequestException as e:
         logging.error("Shell body failed: %s", e)
+        return {"success": False, "error": str(e)}
 
 
 @mcp.tool()
@@ -1320,6 +1379,82 @@ def close_sketch(sketch_id = None):
     except Exception as e:
         logging.error("Close sketch failed: %s", e)
         raise
+
+
+@mcp.tool()
+def check_shell_status(body_id = 0):
+    """
+    Checks if a body has already been shelled to prevent duplicate shell operations.
+
+    This is a safety check before calling shell_body() to avoid the
+    "ASM_LOP_HOL_MULTI_SHELL - body already shelled" error.
+
+    :param body_id: Body ID, index, or name to check (default: 0 = first body)
+    :return: {
+        "success": true,
+        "has_shell": true/false,
+        "shell_count": number of shell operations found,
+        "message": "helpful message"
+    }
+
+    Usage:
+    ```python
+    # Before shelling, check if it's safe
+    status = check_shell_status(body_id=0)
+
+    if status["has_shell"]:
+        print(f"Body already shelled! {status['shell_count']} shell operation(s) found")
+        print("Use undo() or delete_all() to start fresh")
+    else:
+        # Safe to shell
+        shell_body(thickness=0.3, faceindex=0)
+    ```
+    """
+    try:
+        # Use get_feature_history to check for shell features
+        history = get_feature_history(body_id=body_id, include_parameters=False, include_errors=False)
+
+        if not history.get("success"):
+            return {
+                "success": False,
+                "error": "Could not retrieve feature history",
+                "message": history.get("error", "Unknown error")
+            }
+
+        # Count shell features
+        shell_count = 0
+        shell_features = []
+        for feature in history.get("features", []):
+            if feature.get("type") == "Shell":
+                shell_count += 1
+                shell_features.append({
+                    "name": feature.get("name"),
+                    "status": feature.get("status"),
+                    "index": feature.get("index")
+                })
+
+        has_shell = shell_count > 0
+
+        return {
+            "success": True,
+            "has_shell": has_shell,
+            "shell_count": shell_count,
+            "shell_features": shell_features,
+            "message": (
+                f"Body has {shell_count} shell operation(s). Cannot shell again."
+                if has_shell
+                else "Body has not been shelled yet. Safe to apply shell operation."
+            )
+        }
+
+    except Exception as e:
+        logging.error("Check shell status failed: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to check shell status"
+        }
+
 
 
 

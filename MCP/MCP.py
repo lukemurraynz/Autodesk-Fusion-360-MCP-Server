@@ -1487,13 +1487,41 @@ def extrude_last_sketch(design, ui, value,taperangle):
 def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
     """
     Shells the body on a specified face index with given thickness
+    Checks if body has already been shelled to prevent duplicate shell operations
     """
     try:
         rootComp = design.rootComponent
         features = rootComp.features
         body = rootComp.bRepBodies.item(0)
 
+        # Check if body has already been shelled by examining timeline
+        timeline = design.timeline
+        shell_count = 0
+        for i in range(timeline.count):
+            timeline_obj = timeline.item(i)
+            entity = timeline_obj.entity
+            if entity and entity.objectType == adsk.fusion.ShellFeature.classType():
+                shell_count += 1
+
+        if shell_count > 0:
+            error_msg = (f"Body has already been shelled ({shell_count} shell operation(s) detected). "
+                        "Cannot apply shell again. Consider:\n"
+                        "1. Use undo() to remove previous shell\n"
+                        "2. Delete and recreate the model\n"
+                        "3. Adjust thickness of existing shell via parameters")
+            if ui:
+                ui.messageBox('Shell Operation Skipped:\n{}'.format(error_msg))
+            return {"success": False, "error": "already_shelled", "message": error_msg}
+
         entities = adsk.core.ObjectCollection.create()
+
+        # Validate face index
+        if faceindex < 0 or faceindex >= body.faces.count:
+            error_msg = f"Invalid face index {faceindex}. Body has {body.faces.count} faces (valid range: 0-{body.faces.count-1})"
+            if ui:
+                ui.messageBox('Shell Failed:\n{}'.format(error_msg))
+            return {"success": False, "error": "invalid_face_index", "message": error_msg}
+
         entities.add(body.faces.item(faceindex))
 
         shellFeats = features.shellFeatures
@@ -1507,16 +1535,55 @@ def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
 
         # Ausführen
         shellFeats.add(shellInput)
+        return {"success": True, "message": "Shell applied successfully"}
 
     except RuntimeError as e:
         # Log RuntimeError without UI popup (e.g., "Shell compute failed", "no lump left")
+        error_msg = str(e)
+
+        # Check for specific shell errors and provide helpful guidance
+        if "ASM_LOP_HOL_MULTI_SHELL" in error_msg or "already been shelled" in error_msg:
+            guidance = (f"Shell Failed: {error_msg}\n\n"
+                       "The body appears to have already been shelled. Solutions:\n"
+                       "1. Use undo() to remove the previous shell operation\n"
+                       "2. Delete all objects and start fresh with delete_all()\n"
+                       "3. Check your workflow - shells should only be applied once")
+        elif "ASM_RBI_NO_LUMP_LEFT" in error_msg or "does not cause a meaningful shape change" in error_msg:
+            guidance = (f"Shell Failed: {error_msg}\n\n"
+                       "The shell thickness is too large or invalid for this body.\n\n"
+                       "Solutions:\n"
+                       "1. REDUCE THICKNESS: Try 0.1 cm (1mm) instead of current value\n"
+                       "2. Try a different face index (0, 1, 2, 3, 4, 5)\n"
+                       "3. Verify body has sufficient volume for wall thickness\n"
+                       "4. Use extrude_thin() as an alternative method\n\n"
+                       "Quick fix: undo(); shell_body(thickness=0.1, faceindex=0)")
+        elif "ASM_API_FAILED" in error_msg or "The operation failed" in error_msg:
+            guidance = (f"Shell Failed: {error_msg}\n\n"
+                       "Generic API failure - usually caused by geometry issues.\n\n"
+                       "Troubleshooting steps:\n"
+                       "1. Try DIFFERENT FACE INDEX: undo(); shell_body(thickness=0.1, faceindex=1)\n"
+                       "2. REDUCE THICKNESS: Try 0.1 cm (1mm) instead\n"
+                       "3. Check body geometry: verify it's a valid closed solid\n"
+                       "4. Try different shell method: use extrude_thin() instead\n"
+                       "5. If all faces fail, rebuild: delete_all() and start fresh\n\n"
+                       "Common cause: face selection or body geometry invalid")
+        elif "invalid transform" in error_msg:
+            guidance = (f"Shell Failed: {error_msg}\n\n"
+                       "Face selection or geometry issue. Solutions:\n"
+                       "1. Try a different face index\n"
+                       "2. Verify body geometry is valid\n"
+                       "3. Check that face exists")
+        else:
+            guidance = f"Shell Failed: {error_msg}"
+
         if ui:
-            error_msg = str(e)
-            # Only show UI popup for failures - this logs the error
+            ui.messageBox(guidance)
+        return {"success": False, "error": "runtime_error", "message": guidance}
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        if ui:
             ui.messageBox('Failed:\n{}'.format(error_msg))
-    except:
-        if ui:
-            ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": "unknown_error", "message": error_msg}
 
 
 def fillet_edges(design, ui, radius=0.3, edge_ids=None):
