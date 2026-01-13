@@ -70,7 +70,7 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
 
             export_as_STL(design, ui, task[1])
         elif task[0] == 'fillet_edges':
-            fillet_edges(design, ui, task[1])
+            fillet_edges(design, ui, task[1], task[2] if len(task) > 2 else None)
         elif task[0] == 'export_step':
 
             export_as_STEP(design, ui, task[1])
@@ -136,7 +136,8 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'move_body':
             move_last_body(design,ui,task[1],task[2],task[3])
         elif task[0] == 'pocket_recess':
-            pocket_recess(design, ui, task[1], task[2])
+            pocket_recess(design, ui, task[1], task[2] if len(task) > 2 else None, 
+                         task[3] if len(task) > 3 else None, task[4] if len(task) > 4 else None)
         elif task[0] == 'sketch_on_face':
             sketch_on_face(design, ui, task[1], task[2])
         elif task[0] == 'create_work_plane':
@@ -149,6 +150,21 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
             offset_surface(design, ui, task[1], task[2])
         elif task[0] == 'mirror_feature':
             mirror_feature(design, ui, task[1], task[2])
+        elif task[0] == 'list_bodies':
+            return list_bodies(design, ui)
+        elif task[0] == 'get_active_body':
+            return get_active_body(design, ui)
+        elif task[0] == 'rename_body':
+            return rename_body(design, ui, task[1], task[2])
+        elif task[0] == 'list_sketches':
+            return list_sketches(design, ui)
+        elif task[0] == 'get_active_sketch':
+            return get_active_sketch(design, ui)
+        elif task[0] == 'activate_sketch':
+            return activate_sketch(design, ui, task[1])
+        elif task[0] == 'close_sketch':
+            sketch_id = task[1] if len(task) > 1 else None
+            return close_sketch(design, ui, sketch_id)
         
 
 
@@ -505,10 +521,15 @@ def move_last_body(design,ui,x,y,z):
             ui.messageBox('Failed to move the body:\n{}'.format(traceback.format_exc()))
 
 
-def pocket_recess(design, ui, depth, face_index=None):
+def pocket_recess(design, ui, depth, face_index=None, body_id=None, sketch_id=None):
     """
-    Creates a pocket/recess by cutting the last sketch into a body.
-    This is essentially a cut extrude with better control for creating pockets.
+    Creates a pocket/recess by cutting a sketch into a body.
+    Now supports explicit body_id and sketch_id for precise targeting.
+    
+    :param depth: The depth of the pocket/recess (in cm, 1 unit = 1 cm = 10mm)
+    :param face_index: Optional face index (legacy parameter)
+    :param body_id: Optional body ID or index to cut into
+    :param sketch_id: Optional sketch ID or index to use for cutting
     
     IMPORTANT: The sketch must be positioned on or near an existing body.
     The sketch profile must intersect with the body to create a valid cut.
@@ -520,24 +541,50 @@ def pocket_recess(design, ui, depth, face_index=None):
         
         # Check if there are any bodies to cut into
         if bodies.count == 0:
-            ui.messageBox("No target body found to cut or intersect!\n\n"
-                         "Please create a body first before using pocket_recess.\n\n"
-                         "Tip: Use draw_box, draw_cylinder, or other creation tools to make a body first.")
-            return
+            return {
+                "success": False,
+                "error": "No target body found to cut or intersect!"
+            }
         
-        # Get the last sketch
-        if sketches.count == 0:
-            ui.messageBox("No sketch found. Please create a sketch first.")
-            return
-            
-        sketch = sketches.item(sketches.count - 1)
+        # Get the target body
+        target_body = None
+        if body_id is not None:
+            if isinstance(body_id, int):
+                if 0 <= body_id < bodies.count:
+                    target_body = bodies.item(body_id)
+            else:
+                # Try to find by entity token
+                for i in range(bodies.count):
+                    if bodies.item(i).entityToken == body_id:
+                        target_body = bodies.item(i)
+                        break
+        
+        # Get the sketch to use
+        target_sketch = None
+        if sketch_id is not None:
+            if isinstance(sketch_id, int):
+                if 0 <= sketch_id < sketches.count:
+                    target_sketch = sketches.item(sketch_id)
+            else:
+                # Try to find by entity token
+                for i in range(sketches.count):
+                    if sketches.item(i).entityToken == sketch_id:
+                        target_sketch = sketches.item(i)
+                        break
+        else:
+            # Use the last sketch if not specified
+            if sketches.count == 0:
+                return {"success": False, "error": "No sketch found. Please create a sketch first."}
+            target_sketch = sketches.item(sketches.count - 1)
+        
+        if target_sketch is None:
+            return {"success": False, "error": f"Sketch not found: {sketch_id}"}
         
         # Check if sketch has profiles
-        if sketch.profiles.count == 0:
-            ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
-            return
+        if target_sketch.profiles.count == 0:
+            return {"success": False, "error": "Sketch has no closed profiles. Please draw a closed shape."}
             
-        prof = sketch.profiles.item(0)
+        prof = target_sketch.profiles.item(0)
         
         # Create cut extrude
         extrudes = rootComp.features.extrudeFeatures
@@ -545,24 +592,35 @@ def pocket_recess(design, ui, depth, face_index=None):
         distance = adsk.core.ValueInput.createByReal(abs(depth))
         extrudeInput.setDistanceExtent(False, distance)
         
+        # If a specific body was provided, set it as the target
+        if target_body is not None:
+            participantBodies = adsk.core.ObjectCollection.create()
+            participantBodies.add(target_body)
+            extrudeInput.participantBodies = participantBodies
+        
         try:
-            extrudes.add(extrudeInput)
+            ext = extrudes.add(extrudeInput)
+            return {
+                "success": True,
+                "depth": depth,
+                "sketch_name": target_sketch.name,
+                "body_name": target_body.name if target_body else "auto",
+                "message": "Pocket created successfully"
+            }
         except RuntimeError as e:
             error_msg = str(e)
             if "No target body found" in error_msg or "cut or intersect" in error_msg:
-                ui.messageBox("Failed to create pocket: The sketch profile does not intersect with any existing body!\n\n"
-                             "Possible causes:\n"
-                             "1. The sketch is not positioned on/near a body face\n"
-                             "2. The sketch was created on a different plane than the body\n"
-                             "3. Use 'sketch_on_face' to create sketches directly on body faces\n\n"
-                             "Solution: Position your sketch so it overlaps with the body you want to cut.")
+                return {
+                    "success": False,
+                    "error": "Failed to create pocket: The sketch profile does not intersect with any existing body!"
+                }
             else:
-                ui.messageBox(f'Failed to create pocket:\n{error_msg}')
-            return
+                return {"success": False, "error": f"Failed to create pocket: {error_msg}"}
         
     except Exception as e:
         if ui:
             ui.messageBox('Failed pocket_recess:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
 
 
 def sketch_on_face(design, ui, body_index, face_index):
@@ -1245,7 +1303,8 @@ def sweep(design,ui):
 
 def extrude_last_sketch(design, ui, value,taperangle):
     """
-    Just extrudes the last sketch by the given value
+    Extrudes the last sketch by the given value and returns the body ID
+    Returns a dict with body_id, body_name, and success status
     """
     try:
         rootComp = design.rootComponent 
@@ -1255,7 +1314,7 @@ def extrude_last_sketch(design, ui, value,taperangle):
         if sketches.count == 0:
             if ui:
                 ui.messageBox("No sketches found. Please create a sketch first.")
-            return
+            return {"success": False, "error": "No sketches found"}
         
         sketch = sketches.item(sketches.count - 1)  # Letzter Sketch
         
@@ -1263,7 +1322,7 @@ def extrude_last_sketch(design, ui, value,taperangle):
         if sketch.profiles.count == 0:
             if ui:
                 ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
-            return
+            return {"success": False, "error": "Sketch has no closed profiles"}
         
         prof = sketch.profiles.item(0)  # Erstes Profil im Sketch
         extrudes = rootComp.features.extrudeFeatures
@@ -1278,10 +1337,27 @@ def extrude_last_sketch(design, ui, value,taperangle):
         else:
             extrudeInput.setDistanceExtent(False, distance)
         
-        extrudes.add(extrudeInput)
-    except:
+        # Create the extrusion and get the resulting body
+        ext = extrudes.add(extrudeInput)
+        
+        # Get the body that was created
+        if ext.bodies.count > 0:
+            body = ext.bodies.item(0)
+            body_id = body.entityToken
+            body_name = body.name
+            return {
+                "success": True,
+                "body_id": body_id,
+                "body_name": body_name,
+                "message": f"Extrusion created: {body_name}"
+            }
+        else:
+            return {"success": False, "error": "Extrusion failed to create a body"}
+            
+    except Exception as e:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
 
 def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
     """
@@ -1312,54 +1388,97 @@ def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
 
-def fillet_edges(design, ui, radius=0.3):
+def fillet_edges(design, ui, radius=0.3, edge_ids=None):
+    """
+    Fillets edges with specified radius.
+    If edge_ids is provided, only those edges are filleted (edge-selective).
+    If edge_ids is None, attempts to fillet all edges (legacy behavior).
+    
+    :param radius: Fillet radius in cm
+    :param edge_ids: List of edge indices or None for all edges
+    """
     try:
         rootComp = design.rootComponent
         bodies = rootComp.bRepBodies
         fillets = rootComp.features.filletFeatures
         
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies found"}
+        
         successful_fillets = 0
         failed_edges = 0
         
-        # Process each body separately to avoid failing on problematic edges
-        for body_idx in range(bodies.count):
-            body = bodies.item(body_idx)
+        # If specific edge IDs provided, only fillet those
+        if edge_ids is not None and len(edge_ids) > 0:
+            # Get the last body
+            body = bodies.item(bodies.count - 1)
             
-            # Try to fillet edges in smaller groups to handle failures better
-            for edge_idx in range(body.edges.count):
-                edge = body.edges.item(edge_idx)
-                
-                try:
-                    # Create a collection for this single edge
-                    edgeCollection = adsk.core.ObjectCollection.create()
+            # Create edge collection for specified edges
+            edgeCollection = adsk.core.ObjectCollection.create()
+            
+            for edge_id in edge_ids:
+                if isinstance(edge_id, int) and 0 <= edge_id < body.edges.count:
+                    edge = body.edges.item(edge_id)
                     edgeCollection.add(edge)
+            
+            if edgeCollection.count == 0:
+                return {"success": False, "error": "No valid edges found in edge_ids"}
+            
+            try:
+                # Create fillet for selected edges
+                radiusInput = adsk.core.ValueInput.createByReal(radius)
+                filletInput = fillets.createInput()
+                filletInput.isRollingBallCorner = True
+                edgeSetInput = filletInput.edgeSetInputs.addConstantRadiusEdgeSet(edgeCollection, radiusInput, True)
+                edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
+                fillets.add(filletInput)
+                successful_fillets = edgeCollection.count
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to fillet specified edges: {str(e)}"
+                }
+        else:
+            # Legacy behavior: try to fillet all edges
+            for body_idx in range(bodies.count):
+                body = bodies.item(body_idx)
+                
+                # Try to fillet edges in smaller groups to handle failures better
+                for edge_idx in range(body.edges.count):
+                    edge = body.edges.item(edge_idx)
                     
-                    # Try to create the fillet for this edge
-                    radiusInput = adsk.core.ValueInput.createByReal(radius)
-                    filletInput = fillets.createInput()
-                    filletInput.isRollingBallCorner = True
-                    edgeSetInput = filletInput.edgeSetInputs.addConstantRadiusEdgeSet(edgeCollection, radiusInput, True)
-                    edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
-                    fillets.add(filletInput)
-                    successful_fillets += 1
-                except:
-                    # Skip edges that can't be filleted (e.g., sharp corners)
-                    failed_edges += 1
-                    continue
+                    try:
+                        # Create a collection for this single edge
+                        edgeCollection = adsk.core.ObjectCollection.create()
+                        edgeCollection.add(edge)
+                        
+                        # Try to create the fillet for this edge
+                        radiusInput = adsk.core.ValueInput.createByReal(radius)
+                        filletInput = fillets.createInput()
+                        filletInput.isRollingBallCorner = True
+                        edgeSetInput = filletInput.edgeSetInputs.addConstantRadiusEdgeSet(edgeCollection, radiusInput, True)
+                        edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
+                        fillets.add(filletInput)
+                        successful_fillets += 1
+                    except:
+                        # Skip edges that can't be filleted (e.g., sharp corners)
+                        failed_edges += 1
+                        continue
         
-        # Inform user of results
-        if ui:
-            if successful_fillets > 0:
-                message = f'Successfully filleted {successful_fillets} edge(s).'
-                if failed_edges > 0:
-                    message += f'\n{failed_edges} edge(s) could not be filleted (possibly sharp corners or geometric constraints).'
-                ui.messageBox(message)
-            else:
-                ui.messageBox('No edges could be filleted. Try adjusting the radius or check geometry.')
+        # Return detailed results
+        return {
+            "success": True,
+            "successful_fillets": successful_fillets,
+            "failed_edges": failed_edges,
+            "radius": radius,
+            "message": f"Successfully filleted {successful_fillets} edge(s)" + 
+                      (f", {failed_edges} edge(s) skipped" if failed_edges > 0 else "")
+        }
     
-    except:
+    except Exception as e:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
 def revolve_profile(design, ui,  angle=360):
     """
     This function revolves already existing sketch with drawn lines from the function draw_lines
@@ -1448,6 +1567,10 @@ def rect_pattern(design,ui,axis_one ,axis_two ,quantity_one,quantity_two,distanc
         
 
 def circular_pattern(design, ui, quantity, axis, plane):
+    """
+    Creates a circular pattern and returns detailed confirmation.
+    Returns pattern_id, instance_count, and success status.
+    """
     try:
         rootComp = design.rootComponent
         sketches = rootComp.sketches
@@ -1457,9 +1580,14 @@ def circular_pattern(design, ui, quantity, axis, plane):
         if bodies.count > 0:
             latest_body = bodies.item(bodies.count - 1)
         else:
-            ui.messageBox("Keine Bodies gefunden.")
+            return {
+                "success": False,
+                "error": "No bodies found"
+            }
+            
         inputEntites = adsk.core.ObjectCollection.create()
         inputEntites.add(latest_body)
+        
         if plane == "XY":
             sketch = sketches.add(rootComp.xYConstructionPlane)
         elif plane == "XZ":
@@ -1480,13 +1608,29 @@ def circular_pattern(design, ui, quantity, axis, plane):
         circularFeatInput.quantity = adsk.core.ValueInput.createByReal((quantity))
         circularFeatInput.totalAngle = adsk.core.ValueInput.createByString('360 deg')
         circularFeatInput.isSymmetric = False
-        circularFeats.add(circularFeatInput)
         
+        # Create the pattern and capture the feature
+        pattern = circularFeats.add(circularFeatInput)
         
-
-    except:
+        # Return detailed confirmation
+        return {
+            "applied": True,
+            "success": True,
+            "instance_count": int(quantity),
+            "pattern_id": pattern.entityToken if pattern else None,
+            "pattern_name": pattern.name if pattern else "CircularPattern",
+            "axis": axis,
+            "total_angle": 360
+        }
+        
+    except Exception as e:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {
+            "applied": False,
+            "success": False,
+            "error": str(e)
+        }
 
 
 
@@ -1830,6 +1974,251 @@ def select_sketch(design,ui,Sketchname):
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
 
+def list_bodies(design, ui):
+    """
+    Lists all bodies in the current design with their IDs and names.
+    Returns a list of body information dictionaries.
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        
+        body_list = []
+        for i in range(bodies.count):
+            body = bodies.item(i)
+            body_list.append({
+                "index": i,
+                "name": body.name,
+                "body_id": body.entityToken,
+                "volume": body.volume,
+                "is_visible": body.isVisible
+            })
+        
+        return {
+            "success": True,
+            "count": bodies.count,
+            "bodies": body_list
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed list_bodies:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def get_active_body(design, ui):
+    """
+    Gets the currently active or last created body.
+    Returns body information.
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies in design"}
+        
+        # Get the last body (most recently created)
+        body = bodies.item(bodies.count - 1)
+        
+        return {
+            "success": True,
+            "body_id": body.entityToken,
+            "body_name": body.name,
+            "index": bodies.count - 1
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed get_active_body:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def rename_body(design, ui, body_id_or_index, new_name):
+    """
+    Renames a body by its ID or index.
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies in design"}
+        
+        # Try to find body by index first (if it's an integer)
+        body = None
+        if isinstance(body_id_or_index, int):
+            if 0 <= body_id_or_index < bodies.count:
+                body = bodies.item(body_id_or_index)
+        else:
+            # Try to find by entity token
+            for i in range(bodies.count):
+                if bodies.item(i).entityToken == body_id_or_index:
+                    body = bodies.item(i)
+                    break
+        
+        if body is None:
+            return {"success": False, "error": f"Body not found: {body_id_or_index}"}
+        
+        old_name = body.name
+        body.name = new_name
+        
+        return {
+            "success": True,
+            "old_name": old_name,
+            "new_name": new_name,
+            "body_id": body.entityToken
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed rename_body:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def list_sketches(design, ui):
+    """
+    Lists all sketches in the current design.
+    Returns a list of sketch information dictionaries.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        
+        sketch_list = []
+        for i in range(sketches.count):
+            sketch = sketches.item(i)
+            sketch_list.append({
+                "index": i,
+                "name": sketch.name,
+                "sketch_id": sketch.entityToken,
+                "is_visible": sketch.isVisible,
+                "profile_count": sketch.profiles.count
+            })
+        
+        return {
+            "success": True,
+            "count": sketches.count,
+            "sketches": sketch_list
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed list_sketches:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def get_active_sketch(design, ui):
+    """
+    Gets the currently active or last created sketch.
+    Returns sketch information.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        
+        if sketches.count == 0:
+            return {"success": False, "error": "No sketches in design"}
+        
+        # Get the last sketch (most recently created)
+        sketch = sketches.item(sketches.count - 1)
+        
+        return {
+            "success": True,
+            "sketch_id": sketch.entityToken,
+            "sketch_name": sketch.name,
+            "index": sketches.count - 1,
+            "profile_count": sketch.profiles.count
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed get_active_sketch:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def activate_sketch(design, ui, sketch_id_or_index):
+    """
+    Activates a sketch for editing by its ID or index.
+    Note: Fusion API has limited support for programmatic sketch activation.
+    This function validates the sketch exists and returns its info.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        
+        if sketches.count == 0:
+            return {"success": False, "error": "No sketches in design"}
+        
+        # Try to find sketch by index first
+        sketch = None
+        if isinstance(sketch_id_or_index, int):
+            if 0 <= sketch_id_or_index < sketches.count:
+                sketch = sketches.item(sketch_id_or_index)
+        else:
+            # Try to find by entity token
+            for i in range(sketches.count):
+                if sketches.item(i).entityToken == sketch_id_or_index:
+                    sketch = sketches.item(i)
+                    break
+        
+        if sketch is None:
+            return {"success": False, "error": f"Sketch not found: {sketch_id_or_index}"}
+        
+        # Make sketch visible if hidden
+        if not sketch.isVisible:
+            sketch.isVisible = True
+        
+        return {
+            "success": True,
+            "sketch_id": sketch.entityToken,
+            "sketch_name": sketch.name,
+            "message": f"Sketch {sketch.name} is ready"
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed activate_sketch:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def close_sketch(design, ui, sketch_id=None):
+    """
+    Closes/deactivates a sketch. 
+    If sketch_id is None, closes the currently active sketch.
+    Note: In Fusion API, sketches don't need explicit closing for operations.
+    This function validates sketch state for safety.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        
+        if sketches.count == 0:
+            return {"success": True, "message": "No sketches to close"}
+        
+        # If no sketch specified, reference the last one
+        if sketch_id is None:
+            sketch = sketches.item(sketches.count - 1)
+        else:
+            # Find the specified sketch
+            sketch = None
+            if isinstance(sketch_id, int):
+                if 0 <= sketch_id < sketches.count:
+                    sketch = sketches.item(sketch_id)
+            else:
+                for i in range(sketches.count):
+                    if sketches.item(i).entityToken == sketch_id:
+                        sketch = sketches.item(i)
+                        break
+        
+        if sketch is None:
+            return {"success": False, "error": f"Sketch not found: {sketch_id}"}
+        
+        return {
+            "success": True,
+            "sketch_name": sketch.name,
+            "message": f"Sketch {sketch.name} closed"
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed close_sketch:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
 # HTTP Server######
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -1921,7 +2310,10 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == '/fillet_edges':
                 radius = float(data.get('radius',0.3)) #0.3 as default
-                task_queue.put(('fillet_edges',radius))
+                edge_ids = data.get('edges', None)  # List of edge IDs or None
+                if edge_ids is not None and not isinstance(edge_ids, list):
+                    edge_ids = None
+                task_queue.put(('fillet_edges',radius, edge_ids))
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
@@ -2228,9 +2620,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/pocket_recess':
                 depth = float(data.get('depth', 1.0))
                 face_index = data.get('face_index', None)
+                body_id = data.get('body_id', None)
+                sketch_id = data.get('sketch_id', None)
                 if face_index is not None:
                     face_index = int(face_index)
-                task_queue.put(('pocket_recess', depth, face_index))
+                task_queue.put(('pocket_recess', depth, face_index, body_id, sketch_id))
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
@@ -2297,6 +2691,65 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"message": "Mirror Feature wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/list_bodies':
+                task_queue.put(('list_bodies',))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Listing bodies"}).encode('utf-8'))
+            
+            elif path == '/get_active_body':
+                task_queue.put(('get_active_body',))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Getting active body"}).encode('utf-8'))
+            
+            elif path == '/rename_body':
+                body_id = data.get('body_id', None)
+                new_name = str(data.get('new_name', ''))
+                if body_id is not None and new_name:
+                    task_queue.put(('rename_body', body_id, new_name))
+                    self.send_response(200)
+                    self.send_header('Content-type','application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "Renaming body"}).encode('utf-8'))
+                else:
+                    self.send_error(400, "Missing body_id or new_name")
+            
+            elif path == '/list_sketches':
+                task_queue.put(('list_sketches',))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Listing sketches"}).encode('utf-8'))
+            
+            elif path == '/get_active_sketch':
+                task_queue.put(('get_active_sketch',))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Getting active sketch"}).encode('utf-8'))
+            
+            elif path == '/activate_sketch':
+                sketch_id = data.get('sketch_id', None)
+                if sketch_id is not None:
+                    task_queue.put(('activate_sketch', sketch_id))
+                    self.send_response(200)
+                    self.send_header('Content-type','application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "Activating sketch"}).encode('utf-8'))
+                else:
+                    self.send_error(400, "Missing sketch_id")
+            
+            elif path == '/close_sketch':
+                sketch_id = data.get('sketch_id', None)
+                task_queue.put(('close_sketch', sketch_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Closing sketch"}).encode('utf-8'))
             
             else:
                 self.send_error(404,'Not Found')

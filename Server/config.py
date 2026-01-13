@@ -47,6 +47,13 @@ ENDPOINTS = {
     "draw_polygon": f"{BASE_URL}/draw_polygon",
     "offset_surface": f"{BASE_URL}/offset_surface",
     "mirror_feature": f"{BASE_URL}/mirror_feature",
+    "list_bodies": f"{BASE_URL}/list_bodies",
+    "get_active_body": f"{BASE_URL}/get_active_body",
+    "rename_body": f"{BASE_URL}/rename_body",
+    "list_sketches": f"{BASE_URL}/list_sketches",
+    "get_active_sketch": f"{BASE_URL}/get_active_sketch",
+    "activate_sketch": f"{BASE_URL}/activate_sketch",
+    "close_sketch": f"{BASE_URL}/close_sketch",
     
 }
 

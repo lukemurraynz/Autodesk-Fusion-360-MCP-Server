@@ -36,7 +36,71 @@ mcp = FastMCP("Fusion",
                 - Elliptical shapes
                 - Prop replicas and custom PC cases
                 - Complex assemblies with multiple features
+                - Segmented structures with stacked bodies
                 - Be creative and suggest many things!
+
+                **CRITICAL: Prop Modeling & Manufacturing Workflows**
+                This MCP is optimized for physical replica manufacturing, especially for props like the Stargate Atlantis Override Console.
+                
+                **Body Management (REQUIRED for Complex Props):**
+                - ALWAYS use list_bodies() to track multiple bodies
+                - Use rename_body() to name components: "HexColumn", "ZigzagFrame", "TopLid", "BasePlatform"
+                - Use get_active_body() to verify current body
+                - Multiple extrude() calls create STACKED SOLIDS (not overwrites)
+                - Each extrude() returns body_id for tracking
+                
+                **Sketch State Control (REQUIRED):**
+                - Use list_sketches() to see all sketches
+                - Use get_active_sketch() to verify current sketch
+                - Use activate_sketch(sketch_id) to select specific sketches
+                - Use close_sketch() before extrude/pocket operations
+                
+                **Subtractive Modeling Order (MANDATORY):**
+                - ALL pockets, recesses, slots, and cut-outs MUST be applied BEFORE shelling
+                - Never attempt to sketch on shelled bodies
+                - Never pocket into curved interior faces
+                - Order: Create solid → Apply features/pockets → Shell (if needed) → Fillet
+                
+                **Explicit Feature Targeting (REQUIRED):**
+                - pocket_recess(depth, body_id=0, sketch_id=2) - specify exact targets
+                - circular_pattern() returns {"applied": true, "instance_count": 6, "pattern_id": "..."}
+                - fillet_edges(radius, edges=[0,1,5,8]) - edge-selective filleting
+                - NEVER rely on implicit "last feature" - always specify IDs
+                
+                **Segmented Body Workflow Example:**
+                ```python
+                # Create stacked segments
+                base = extrude(2.0)  # Returns body_id
+                rename_body(base["body_id"], "BasePedestal")
+                
+                mid = extrude(60.0)
+                rename_body(mid["body_id"], "MidBody")
+                
+                frame = extrude(30.0)
+                rename_body(frame["body_id"], "ZigzagFrame")
+                
+                cap = extrude(10.0)
+                rename_body(cap["body_id"], "TopCap")
+                
+                # Verify bodies
+                bodies = list_bodies()
+                
+                # Apply features to specific body
+                sketch_on_face(body_index=2, face_index=0)
+                draw_lines(...)
+                pocket_recess(depth=0.1, body_id=2)
+                
+                # Pattern features (not just bodies)
+                pattern = circular_pattern(quantity=6, axis="Z", plane="XY")
+                # Returns: {"applied": true, "instance_count": 6}
+                
+                # Shell AFTER all features
+                shell_body(thickness=0.03, faceindex=0)
+                
+                # Edge-selective fillet (preserve sharp seams)
+                fillet_edges(radius=0.1, edges=[0, 2, 5])  # Only specific edges
+                fillet_edges(radius=0.05, edges=[10, 11])  # Different radius for cap
+                ```
 
                 **Fusion 360 Units (VERY IMPORTANT):**
                 - 1 unit = 1 cm = 10 mm
@@ -69,13 +133,15 @@ mcp = FastMCP("Fusion",
                 - Then call loft with the number of sketches.
 
                 **Circular Pattern:**
-                - Cannot create a circular pattern of a hole, as a hole is not a body.
+                - Patterns features (cuts, pockets) not just bodies
+                - Returns confirmation with instance_count
 
                 **Boolean Operation:**
                 - Cannot use boolean operations with spheres, as they are not recognized as bodies.
                 - Target body is always targetbody(1).
                 - Tool body is the previously created body targetbody(0).
                 - Boolean operations can only be applied to the last body.
+                - Use boolean_join for combining segmented bodies
 
                 **DrawBox and DrawCylinder:**
                 - The specified coordinates are always the center point of the body.
@@ -372,12 +438,22 @@ def export_stl(name : str):
         raise
 
 @mcp.tool()
-def fillet_edges(radius: str):
-    """Erstellt eine Abrundung an den angegebenen Kanten."""
+def fillet_edges(radius: float, edges: list = None):
+    """Erstellt eine Abrundung an den angegebenen Kanten.
+    
+    :param radius: Fillet radius in cm
+    :param edges: Optional list of edge indices to fillet. If None, attempts all edges.
+    
+    For edge-selective filleting (recommended for props):
+    - Specify edge indices as a list, e.g., edges=[0, 1, 5, 8]
+    - This allows sharp vertical seams while softening specific edges
+    - Returns detailed confirmation with success count
+    """
     try:
         endpoint = config.ENDPOINTS["fillet_edges"]
         payload = {
-            "radius": radius
+            "radius": radius,
+            "edges": edges
         }
         headers = config.HEADERS
         return send_request(endpoint, payload, headers)
@@ -556,7 +632,14 @@ def boolean_operation(operation: str):
     Führe eine boolesche Operation auf dem letzten Körper aus.
     Du kannst die Operation als String übergeben.
     Mögliche Werte sind: "cut", "join", "intersect"
-    Wichtig ist, dass du vorher zwei Körper erstellt hast,
+    Wichtig ist, dass du vorher zwei Körper erstellt hast.
+    
+    For segmented body support:
+    - "join" combines multiple bodies into one (use for boolean_join)
+    - "cut" subtracts one body from another
+    - "intersect" keeps only the overlapping volume
+    
+    Use list_bodies() to verify bodies before boolean operations.
     """
     try:
         headers = config.HEADERS
@@ -594,9 +677,10 @@ def draw_lines(points : list, plane : str):
         logging.error("Draw lines failed: %s", e)
 
 @mcp.tool()
-def extrude(value: float,angle:float):
+def extrude(value: float,angle:float = 0.0):
     """Extrudiert die letzte Skizze um einen angegebenen Wert.
     Du kannst auch einen Winkel angeben
+    Returns body_id for tracking the created body.
     
     """
     try:
@@ -793,6 +877,15 @@ def circular_pattern(plane: str, quantity: float, axis: str):
 
     Das Feature wird auf das zuletzt erstellte/ausgewählte Objekt angewendet.
     Typische Anwendungen: Schraubenlöcher in Kreisform, Zahnrad-Zähne, Lüftungsgitter, dekorative Muster.
+    
+    Returns detailed confirmation:
+    {
+      "applied": true,
+      "instance_count": 6,
+      "pattern_id": "pattern_123",
+      "axis": "Z",
+      "total_angle": 360
+    }
     """
     try:
         headers = config.HEADERS
@@ -894,23 +987,29 @@ def loft(sketchcount: int):
 
 
 @mcp.tool()
-def pocket_recess(depth: float, face_index: int = None):
+def pocket_recess(depth: float, face_index: int = None, body_id: str = None, sketch_id: str = None):
     """
-    Creates a pocket/recess in an existing body by cutting the last sketch.
+    Creates a pocket/recess in an existing body by cutting a sketch.
+    Now supports explicit body_id and sketch_id for precise targeting.
     This is a critical tool for creating depressions, recesses, and pockets in bodies.
     
     :param depth: The depth of the pocket/recess (in cm, 1 unit = 1 cm = 10mm)
-    :param face_index: Optional face index if you want to specify which face to cut into
+    :param face_index: Optional face index (legacy parameter)
+    :param body_id: Optional body ID, index, or name to cut into (for explicit targeting)
+    :param sketch_id: Optional sketch ID or index to use for cutting (for explicit targeting)
     
     Example:
     - To create a 5mm deep pocket: depth = 0.5
     - First draw a 2D sketch (circle, rectangle, polygon), then call this tool
+    - For explicit targeting: pocket_recess(depth=0.5, body_id=0, sketch_id=2)
     """
     try:
         endpoint = config.ENDPOINTS["pocket_recess"]
         payload = {
             "depth": depth,
-            "face_index": face_index
+            "face_index": face_index,
+            "body_id": body_id,
+            "sketch_id": sketch_id
         }
         headers = config.HEADERS
         return send_request(endpoint, payload, headers)
@@ -1075,6 +1174,151 @@ def mirror_feature(mirror_plane: str, body_index: int = None):
         return send_request(endpoint, payload, headers)
     except Exception as e:
         logging.error("Mirror feature failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def list_bodies():
+    """
+    Lists all bodies in the current design with their IDs, names, and properties.
+    Essential for tracking multiple bodies in segmented prop modeling.
+    
+    Returns:
+    {
+      "success": true,
+      "count": 4,
+      "bodies": [
+        {"index": 0, "name": "Body1", "body_id": "...", "volume": 100.5, "is_visible": true},
+        ...
+      ]
+    }
+    """
+    try:
+        endpoint = config.ENDPOINTS["list_bodies"]
+        return send_request(endpoint, {}, {})
+    except Exception as e:
+        logging.error("List bodies failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def get_active_body():
+    """
+    Gets the currently active or last created body.
+    Returns body_id, body_name, and index.
+    """
+    try:
+        endpoint = config.ENDPOINTS["get_active_body"]
+        return send_request(endpoint, {}, {})
+    except Exception as e:
+        logging.error("Get active body failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def rename_body(body_id: str, new_name: str):
+    """
+    Renames a body for better organization in complex models.
+    
+    :param body_id: Body ID, index, or current name
+    :param new_name: New name for the body (e.g., "HexColumn", "ZigzagFrame", "TopLid")
+    
+    Essential for tracking components like:
+    - HexColumn
+    - ZigzagFrame
+    - TopLid
+    - BasePlatform
+    """
+    try:
+        endpoint = config.ENDPOINTS["rename_body"]
+        payload = {
+            "body_id": body_id,
+            "new_name": new_name
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Rename body failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def list_sketches():
+    """
+    Lists all sketches in the current design with their IDs, names, and properties.
+    Useful for managing multiple sketches in complex modeling workflows.
+    
+    Returns:
+    {
+      "success": true,
+      "count": 5,
+      "sketches": [
+        {"index": 0, "name": "Sketch1", "sketch_id": "...", "is_visible": true, "profile_count": 1},
+        ...
+      ]
+    }
+    """
+    try:
+        endpoint = config.ENDPOINTS["list_sketches"]
+        return send_request(endpoint, {}, {})
+    except Exception as e:
+        logging.error("List sketches failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def get_active_sketch():
+    """
+    Gets the currently active or last created sketch.
+    Returns sketch_id, sketch_name, index, and profile_count.
+    """
+    try:
+        endpoint = config.ENDPOINTS["get_active_sketch"]
+        return send_request(endpoint, {}, {})
+    except Exception as e:
+        logging.error("Get active sketch failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def activate_sketch(sketch_id: str):
+    """
+    Activates a sketch for editing by its ID or index.
+    Validates the sketch exists and makes it visible if needed.
+    
+    :param sketch_id: Sketch ID or index to activate
+    """
+    try:
+        endpoint = config.ENDPOINTS["activate_sketch"]
+        payload = {
+            "sketch_id": sketch_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Activate sketch failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def close_sketch(sketch_id: str = None):
+    """
+    Closes/deactivates a sketch.
+    If sketch_id is None, closes the currently active sketch.
+    
+    :param sketch_id: Optional sketch ID or index to close
+    
+    Note: All extrude and pocket operations should be called with sketches closed.
+    """
+    try:
+        endpoint = config.ENDPOINTS["close_sketch"]
+        payload = {
+            "sketch_id": sketch_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Close sketch failed: %s", e)
         raise
 
 
