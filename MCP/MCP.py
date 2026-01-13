@@ -135,6 +135,20 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
             draw_text(design, ui, task[1], task[2], task[3], task[4], task[5], task[6], task[7], task[8], task[9],task[10])
         elif task[0] == 'move_body':
             move_last_body(design,ui,task[1],task[2],task[3])
+        elif task[0] == 'pocket_recess':
+            pocket_recess(design, ui, task[1], task[2])
+        elif task[0] == 'sketch_on_face':
+            sketch_on_face(design, ui, task[1], task[2])
+        elif task[0] == 'create_work_plane':
+            create_work_plane(design, ui, task[1], task[2], task[3])
+        elif task[0] == 'project_edges':
+            project_edges(design, ui, task[1])
+        elif task[0] == 'draw_polygon':
+            draw_polygon(design, ui, task[1], task[2], task[3], task[4], task[5], task[6])
+        elif task[0] == 'offset_surface':
+            offset_surface(design, ui, task[1], task[2])
+        elif task[0] == 'mirror_feature':
+            mirror_feature(design, ui, task[1], task[2])
         
 
 
@@ -491,10 +505,349 @@ def move_last_body(design,ui,x,y,z):
             ui.messageBox('Failed to move the body:\n{}'.format(traceback.format_exc()))
 
 
-def offsetplane(design,ui,offset,plane ="XY"):
+def pocket_recess(design, ui, depth, face_index=None):
+    """
+    Creates a pocket/recess by cutting the last sketch into a body.
+    This is essentially a cut extrude with better control for creating pockets.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        bodies = rootComp.bRepBodies
+        
+        # Get the last sketch
+        if sketches.count == 0:
+            ui.messageBox("No sketch found. Please create a sketch first.")
+            return
+            
+        sketch = sketches.item(sketches.count - 1)
+        
+        # Check if sketch has profiles
+        if sketch.profiles.count == 0:
+            ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
+            return
+            
+        prof = sketch.profiles.item(0)
+        
+        # Create cut extrude
+        extrudes = rootComp.features.extrudeFeatures
+        extrudeInput = extrudes.createInput(prof, adsk.fusion.FeatureOperations.CutFeatureOperation)
+        distance = adsk.core.ValueInput.createByReal(abs(depth))
+        extrudeInput.setDistanceExtent(False, distance)
+        extrudes.add(extrudeInput)
+        
+    except:
+        if ui:
+            ui.messageBox('Failed pocket_recess:\n{}'.format(traceback.format_exc()))
 
-    """,
-    Creates a new offset sketch which can be selected
+
+def sketch_on_face(design, ui, body_index, face_index):
+    """
+    Creates a new sketch on a specific face of a body.
+    This allows sketching directly on angled or curved surfaces.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        bodies = rootComp.bRepBodies
+        
+        if bodies.count == 0:
+            ui.messageBox("No bodies found in the design.")
+            return
+            
+        # Get the specified body (default to last body if index out of range)
+        if body_index >= bodies.count or body_index < 0:
+            body = bodies.item(bodies.count - 1)
+        else:
+            body = bodies.item(body_index)
+        
+        # Get the specified face
+        if face_index >= body.faces.count or face_index < 0:
+            ui.messageBox(f"Face index {face_index} is out of range. Body has {body.faces.count} faces.")
+            return
+            
+        face = body.faces.item(face_index)
+        
+        # Create sketch on the face
+        sketch = sketches.add(face)
+        
+        ui.messageBox(f"Sketch created on face {face_index} of body {body_index}")
+        
+    except:
+        if ui:
+            ui.messageBox('Failed sketch_on_face:\n{}'.format(traceback.format_exc()))
+
+
+def create_work_plane(design, ui, plane_type, offset_distance, reference_index=0):
+    """
+    Creates a construction/work plane for advanced sketching.
+    plane_type: 'offset_xy', 'offset_xz', 'offset_yz', 'face_offset', 'midplane'
+    offset_distance: distance to offset the plane
+    reference_index: face or plane index for reference (used with face_offset)
+    """
+    try:
+        rootComp = design.rootComponent
+        planes = rootComp.constructionPlanes
+        planeInput = planes.createInput()
+        
+        if plane_type == 'offset_xy':
+            basePlane = rootComp.xYConstructionPlane
+            offsetValue = adsk.core.ValueInput.createByReal(offset_distance)
+            planeInput.setByOffset(basePlane, offsetValue)
+            
+        elif plane_type == 'offset_xz':
+            basePlane = rootComp.xZConstructionPlane
+            offsetValue = adsk.core.ValueInput.createByReal(offset_distance)
+            planeInput.setByOffset(basePlane, offsetValue)
+            
+        elif plane_type == 'offset_yz':
+            basePlane = rootComp.yZConstructionPlane
+            offsetValue = adsk.core.ValueInput.createByReal(offset_distance)
+            planeInput.setByOffset(basePlane, offsetValue)
+            
+        elif plane_type == 'face_offset':
+            bodies = rootComp.bRepBodies
+            if bodies.count == 0:
+                ui.messageBox("No bodies found for face offset plane.")
+                return
+            body = bodies.item(bodies.count - 1)
+            if reference_index >= body.faces.count:
+                ui.messageBox(f"Face index {reference_index} out of range.")
+                return
+            face = body.faces.item(reference_index)
+            offsetValue = adsk.core.ValueInput.createByReal(offset_distance)
+            planeInput.setByOffset(face, offsetValue)
+        
+        # Create the plane
+        plane = planes.add(planeInput)
+        
+    except:
+        if ui:
+            ui.messageBox('Failed create_work_plane:\n{}'.format(traceback.format_exc()))
+
+
+def project_edges(design, ui, body_index=None):
+    """
+    Projects edges from a body onto the current sketch plane.
+    This allows you to reference existing geometry in your sketch.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        bodies = rootComp.bRepBodies
+        
+        if sketches.count == 0:
+            ui.messageBox("No sketch found. Please create a sketch first.")
+            return
+            
+        if bodies.count == 0:
+            ui.messageBox("No bodies found to project edges from.")
+            return
+            
+        # Get the last sketch
+        sketch = sketches.item(sketches.count - 1)
+        
+        # Get the body to project from
+        if body_index is None or body_index >= bodies.count or body_index < 0:
+            body = bodies.item(bodies.count - 1)
+        else:
+            body = bodies.item(body_index)
+        
+        # Project all edges from the body
+        for i in range(body.edges.count):
+            edge = body.edges.item(i)
+            try:
+                # Create a collection with this edge
+                edgesToProject = adsk.core.ObjectCollection.create()
+                edgesToProject.add(edge)
+                
+                # Project the edges onto the sketch
+                sketch.project(edgesToProject)
+            except:
+                # Some edges may not be projectable, skip them
+                pass
+                
+    except:
+        if ui:
+            ui.messageBox('Failed project_edges:\n{}'.format(traceback.format_exc()))
+
+
+def draw_polygon(design, ui, sides, radius, x, y, z, plane="XY"):
+    """
+    Draws a regular polygon with the specified number of sides.
+    Useful for creating hexagons, pentagons, etc.
+    """
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        planes = rootComp.constructionPlanes
+        
+        # Determine which plane to use
+        if plane == "XZ":
+            basePlane = rootComp.xZConstructionPlane
+            if y != 0:
+                planeInput = planes.createInput()
+                offsetValue = adsk.core.ValueInput.createByReal(y)
+                planeInput.setByOffset(basePlane, offsetValue)
+                offsetPlane = planes.add(planeInput)
+                sketch = sketches.add(offsetPlane)
+            else:
+                sketch = sketches.add(basePlane)
+            
+        elif plane == "YZ":
+            basePlane = rootComp.yZConstructionPlane
+            if x != 0:
+                planeInput = planes.createInput()
+                offsetValue = adsk.core.ValueInput.createByReal(x)
+                planeInput.setByOffset(basePlane, offsetValue)
+                offsetPlane = planes.add(planeInput)
+                sketch = sketches.add(offsetPlane)
+            else:
+                sketch = sketches.add(basePlane)
+            
+        else:  # XY plane (default)
+            basePlane = rootComp.xYConstructionPlane
+            if z != 0:
+                planeInput = planes.createInput()
+                offsetValue = adsk.core.ValueInput.createByReal(z)
+                planeInput.setByOffset(basePlane, offsetValue)
+                offsetPlane = planes.add(planeInput)
+                sketch = sketches.add(offsetPlane)
+            else:
+                sketch = sketches.add(basePlane)
+        
+        # Create polygon using circumscribed circle method
+        lines = sketch.sketchCurves.sketchLines
+        import math
+        angleStep = (2 * math.pi) / sides
+        
+        # Calculate vertices
+        vertices = []
+        for i in range(sides):
+            angle = i * angleStep
+            px = radius * math.cos(angle)
+            py = radius * math.sin(angle)
+            
+            # Create vertices in sketch coordinate system (third parameter is always 0)
+            if plane == "XZ":
+                # XZ plane: X and Z are in-plane, Y is perpendicular
+                vertices.append(adsk.core.Point3D.create(x + px, 0, z + py))
+            elif plane == "YZ":
+                # YZ plane: Y and Z are in-plane, X is perpendicular
+                vertices.append(adsk.core.Point3D.create(0, y + px, z + py))
+            else:  # XY
+                # XY plane: X and Y are in-plane, Z is perpendicular
+                vertices.append(adsk.core.Point3D.create(x + px, y + py, 0))
+        
+        # Draw lines connecting vertices
+        for i in range(sides):
+            nextIndex = (i + 1) % sides
+            lines.addByTwoPoints(vertices[i], vertices[nextIndex])
+            
+    except:
+        if ui:
+            ui.messageBox('Failed draw_polygon:\n{}'.format(traceback.format_exc()))
+
+
+def offset_surface(design, ui, distance, face_index=0):
+    """
+    Creates an offset surface by offsetting faces of a body.
+    Useful for creating wall thicknesses and parallel surfaces.
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        
+        if bodies.count == 0:
+            ui.messageBox("No bodies found.")
+            return
+            
+        body = bodies.item(bodies.count - 1)
+        
+        # Get the face to offset
+        if face_index >= body.faces.count or face_index < 0:
+            ui.messageBox(f"Face index {face_index} out of range.")
+            return
+            
+        face = body.faces.item(face_index)
+        
+        # Create offset face feature
+        offsetFeatures = rootComp.features.offsetFeatures
+        
+        # Create a collection of faces to offset
+        inputFaces = adsk.core.ObjectCollection.create()
+        inputFaces.add(face)
+        
+        # Create offset feature input
+        offsetInput = offsetFeatures.createInput(
+            inputFaces,
+            adsk.core.ValueInput.createByReal(distance),
+            adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+        )
+        
+        # Create the offset
+        offsetFeatures.add(offsetInput)
+        
+    except:
+        if ui:
+            ui.messageBox('Failed offset_surface:\n{}'.format(traceback.format_exc()))
+
+
+def mirror_feature(design, ui, mirror_plane, body_index=None):
+    """
+    Mirrors the latest body or specified body across a plane.
+    mirror_plane: 'XY', 'XZ', 'YZ'
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        mirrorFeatures = rootComp.features.mirrorFeatures
+        
+        if bodies.count == 0:
+            ui.messageBox("No bodies found to mirror.")
+            return
+        
+        # Get the body to mirror
+        if body_index is None or body_index >= bodies.count or body_index < 0:
+            body = bodies.item(bodies.count - 1)
+        else:
+            body = bodies.item(body_index)
+        
+        # Create collection with the body
+        inputEntities = adsk.core.ObjectCollection.create()
+        inputEntities.add(body)
+        
+        # Get the mirror plane
+        if mirror_plane == "XY":
+            mirrorPlane = rootComp.xYConstructionPlane
+        elif mirror_plane == "XZ":
+            mirrorPlane = rootComp.xZConstructionPlane
+        elif mirror_plane == "YZ":
+            mirrorPlane = rootComp.yZConstructionPlane
+        else:
+            ui.messageBox(f"Invalid mirror plane: {mirror_plane}")
+            return
+        
+        # Create mirror input
+        mirrorInput = mirrorFeatures.createInput(inputEntities, mirrorPlane)
+        
+        # Create the mirror feature
+        mirrorFeatures.add(mirrorInput)
+        
+    except:
+        if ui:
+            ui.messageBox('Failed mirror_feature:\n{}'.format(traceback.format_exc()))
+
+
+def offsetplane(design, ui, offset, plane="XY"):
+    """
+    Creates a new offset construction plane which can be selected.
+    
+    :param design: The Fusion 360 design object
+    :param ui: The Fusion 360 user interface object
+    :param offset: Distance to offset the plane (in cm)
+    :param plane: Base plane to offset from ('XY', 'XZ', or 'YZ')
+    :return: None
     """
     try:
         rootComp = design.rootComponent
@@ -1678,6 +2031,79 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"message": "Body wird verschoben"}).encode('utf-8'))
+            
+            elif path == '/pocket_recess':
+                depth = float(data.get('depth', 1.0))
+                face_index = data.get('face_index', None)
+                if face_index is not None:
+                    face_index = int(face_index)
+                task_queue.put(('pocket_recess', depth, face_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Pocket/Recess wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/sketch_on_face':
+                body_index = int(data.get('body_index', -1))
+                face_index = int(data.get('face_index', 0))
+                task_queue.put(('sketch_on_face', body_index, face_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Sketch auf Face wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/create_work_plane':
+                plane_type = str(data.get('plane_type', 'offset_xy'))
+                offset_distance = float(data.get('offset_distance', 0.0))
+                reference_index = int(data.get('reference_index', 0))
+                task_queue.put(('create_work_plane', plane_type, offset_distance, reference_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Work Plane wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/project_edges':
+                body_index = data.get('body_index', None)
+                if body_index is not None:
+                    body_index = int(body_index)
+                task_queue.put(('project_edges', body_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Edges werden projiziert"}).encode('utf-8'))
+            
+            elif path == '/draw_polygon':
+                sides = int(data.get('sides', 6))
+                radius = float(data.get('radius', 5.0))
+                x = float(data.get('x', 0))
+                y = float(data.get('y', 0))
+                z = float(data.get('z', 0))
+                plane = str(data.get('plane', 'XY'))
+                task_queue.put(('draw_polygon', sides, radius, x, y, z, plane))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Polygon wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/offset_surface':
+                distance = float(data.get('distance', 1.0))
+                face_index = int(data.get('face_index', 0))
+                task_queue.put(('offset_surface', distance, face_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Surface Offset wird erstellt"}).encode('utf-8'))
+            
+            elif path == '/mirror_feature':
+                mirror_plane = str(data.get('mirror_plane', 'XY'))
+                body_index = data.get('body_index', None)
+                if body_index is not None:
+                    body_index = int(body_index)
+                task_queue.put(('mirror_feature', mirror_plane, body_index))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Mirror Feature wird erstellt"}).encode('utf-8'))
             
             else:
                 self.send_error(404,'Not Found')

@@ -184,6 +184,7 @@ Just open Claude, an ask for the FusionMCP
 | **Spline** | Draws a **Spline curve** through a list of 3D points (used for sweep path). |
 | **Draw box** | Creates a **box** (solid body) with definable dimensions and position. |
 | **Draw cylinder** | Draws a **cylinder** (solid body). |
+| **Draw polygon** | Creates a **regular polygon** (triangle, hexagon, octagon, etc.) with specified number of sides. |
 | **Draw text**| Draws a text and extrudes it with given values |
 | **Draw Witzenmann logo** | A **fun demo function** for creating the Witzenmann logo. |
 
@@ -199,12 +200,25 @@ Just open Claude, an ask for the FusionMCP
 | **Loft** | Creates a complex body by **lofting** between a defined number of previously created sketches. |
 | **Thin extrusion** | Creates a **thin-walled extrusion** (extrusion with constant wall thickness). |
 | **Cut extrude** | Removes material from a body by **cutting** a sketch (as a hole/pocket). |
+| **Pocket/Recess** | Creates a **pocket or recess** in an existing body by cutting the last sketch into it. Perfect for creating depressions and recesses. |
 | **Draw holes** | Creates **Counterbore holes** at specified points on a surface (`faceindex`). |
 | **Fillet edges** | Rounds sharp edges with a defined **radius** (fillet). |
 | **Shell body** | **Hollows** out the body, leaving a uniform wall thickness. |
 | **Circular pattern** | Creates a **circular pattern** (array) of features or bodies around an axis. |
 | **Rectangular pattern**| Creates a **rectangular pattern** of a body|
+| **Mirror feature** | **Mirrors** a body across a plane (XY, XZ, or YZ) for creating symmetric features. |
+| **Offset surface** | Creates an **offset surface** by offsetting faces inward/outward by a specified distance. |
 
+
+---
+
+### 🔧 Advanced Sketching & Work Planes
+
+| Tool | Description |
+| :--- | :--- |
+| **Sketch on face** | Creates a **sketch directly on a face** of an existing body, enabling sketching on angled or curved surfaces. |
+| **Create work plane** | Creates a **construction/work plane** offset from existing geometry (XY, XZ, YZ planes or body faces). |
+| **Project edges** | **Projects edges** from a body onto the current sketch plane for reference and alignment. |
 
 ---
 
@@ -228,6 +242,44 @@ Just open Claude, an ask for the FusionMCP
 | **Export STEP** | **Exports** the model as a **STEP** file. |
 | **Export STL** | **Exports** the model as an **STL** file. |
 
+
+---
+
+## 🚀 New Advanced Features
+
+These tools address limitations in multi-face feature creation and complex parametric relationships:
+
+### ✨ Face-Based Modeling
+- **Sketch on Face**: Create sketches directly on angled faces (no more floating geometry!)
+- **Pocket/Recess**: Cut depressions into bodies with precise depth control
+- **Project Edges**: Reference existing body edges in your sketches for accurate alignment
+
+### 📐 Construction Aids
+- **Work Planes**: Create offset reference planes from bodies or standard planes
+- **Polygon Tool**: Draw perfect hexagons, octagons, and other regular polygons
+- **Mirror Feature**: Create symmetric features across planes
+
+### 🎯 Surface Operations
+- **Offset Surface**: Create parallel surfaces for wall thicknesses
+- **Advanced Extrude**: Use taper angles for beveled surfaces (via `extrude` with `angle` parameter)
+
+### Example Workflow: Creating Panel Recesses
+```python
+# 1. Create main body
+draw_box(height=10, width=10, depth=2, x=0, y=0, z=0)
+
+# 2. Create sketch on top face
+sketch_on_face(body_index=-1, face_index=4)
+
+# 3. Draw hexagon for recess
+draw_polygon(sides=6, radius=3, x=0, y=0, z=0, plane="XY")
+
+# 4. Create pocket
+pocket_recess(depth=0.5)
+
+# 5. Mirror for symmetric design
+mirror_feature(mirror_plane="XY")
+```
 
 ## Architecture
 

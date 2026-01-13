@@ -854,6 +854,190 @@ def loft(sketchcount: int):
         raise
 
 
+@mcp.tool()
+def pocket_recess(depth: float, face_index: int = None):
+    """
+    Creates a pocket/recess in an existing body by cutting the last sketch.
+    This is a critical tool for creating depressions, recesses, and pockets in bodies.
+    
+    :param depth: The depth of the pocket/recess (in cm, 1 unit = 1 cm = 10mm)
+    :param face_index: Optional face index if you want to specify which face to cut into
+    
+    Example:
+    - To create a 5mm deep pocket: depth = 0.5
+    - First draw a 2D sketch (circle, rectangle, polygon), then call this tool
+    """
+    try:
+        endpoint = config.ENDPOINTS["pocket_recess"]
+        payload = {
+            "depth": depth,
+            "face_index": face_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Pocket recess failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def sketch_on_face(body_index: int = -1, face_index: int = 0):
+    """
+    Creates a new sketch directly on a face of an existing body.
+    This is critical for sketching on angled or curved surfaces.
+    
+    :param body_index: Index of the body (-1 for last body, 0 for first body, etc.)
+    :param face_index: Index of the face to sketch on (0 for first face, 1 for second, etc.)
+    
+    Important: After creating this sketch, you can draw shapes on it, then extrude or cut.
+    Face indices:
+    - For a box: face 0-5 are the six faces
+    - For a cylinder: face 0 is top, face 1 is bottom, face 2 is the curved side
+    """
+    try:
+        endpoint = config.ENDPOINTS["sketch_on_face"]
+        payload = {
+            "body_index": body_index,
+            "face_index": face_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Sketch on face failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def create_work_plane(plane_type: str, offset_distance: float, reference_index: int = 0):
+    """
+    Creates a construction/work plane for advanced sketching.
+    This allows you to create reference planes offset from existing geometry.
+    
+    :param plane_type: Type of plane ('offset_xy', 'offset_xz', 'offset_yz', 'face_offset')
+    :param offset_distance: Distance to offset the plane (in cm)
+    :param reference_index: Face index for 'face_offset' type
+    
+    Examples:
+    - Create a plane 5cm above XY: plane_type='offset_xy', offset_distance=5.0
+    - Create a plane offset from a face: plane_type='face_offset', offset_distance=2.0, reference_index=0
+    """
+    try:
+        endpoint = config.ENDPOINTS["create_work_plane"]
+        payload = {
+            "plane_type": plane_type,
+            "offset_distance": offset_distance,
+            "reference_index": reference_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Create work plane failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def project_edges(body_index: int = None):
+    """
+    Projects edges from a body onto the current sketch plane.
+    This allows you to reference existing geometry in your sketch.
+    
+    :param body_index: Index of body to project from (None for last body)
+    
+    Important: Create a sketch first (like sketch_on_face or on a plane), 
+    then call this to project edges for reference.
+    """
+    try:
+        endpoint = config.ENDPOINTS["project_edges"]
+        payload = {
+            "body_index": body_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Project edges failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def draw_polygon(sides: int, radius: float, x: float, y: float, z: float, plane: str = "XY"):
+    """
+    Draws a regular polygon with the specified number of sides.
+    Perfect for creating hexagons (6 sides), pentagons (5 sides), octagons (8 sides), etc.
+    
+    :param sides: Number of sides (3 for triangle, 6 for hexagon, 8 for octagon, etc.)
+    :param radius: Radius of the circumscribed circle (in cm)
+    :param x: X coordinate of center
+    :param y: Y coordinate of center
+    :param z: Z coordinate of center
+    :param plane: Plane to draw on ("XY", "XZ", "YZ")
+    
+    Example for a hexagon:
+    - sides=6, radius=5.0 creates a hexagon with 5cm radius
+    """
+    try:
+        endpoint = config.ENDPOINTS["draw_polygon"]
+        payload = {
+            "sides": sides,
+            "radius": radius,
+            "x": x,
+            "y": y,
+            "z": z,
+            "plane": plane
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Draw polygon failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def offset_surface(distance: float, face_index: int = 0):
+    """
+    Creates an offset surface by offsetting faces of a body.
+    Useful for creating parallel surfaces and wall thicknesses.
+    
+    :param distance: Offset distance (positive or negative, in cm)
+    :param face_index: Index of the face to offset
+    
+    Example: distance=1.0 offsets the face by 1cm outward
+    """
+    try:
+        endpoint = config.ENDPOINTS["offset_surface"]
+        payload = {
+            "distance": distance,
+            "face_index": face_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Offset surface failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def mirror_feature(mirror_plane: str, body_index: int = None):
+    """
+    Mirrors a body across a plane for creating symmetric features.
+    
+    :param mirror_plane: Plane to mirror across ("XY", "XZ", "YZ")
+    :param body_index: Index of body to mirror (None for last body)
+    
+    Example: mirror_plane="XY" mirrors the body across the XY plane
+    This is useful for creating symmetric panels and features.
+    """
+    try:
+        endpoint = config.ENDPOINTS["mirror_feature"]
+        payload = {
+            "mirror_plane": mirror_plane,
+            "body_index": body_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Mirror feature failed: %s", e)
+        raise
+
 
 
 @mcp.prompt()
