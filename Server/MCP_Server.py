@@ -677,7 +677,7 @@ def draw_lines(points : list, plane : str):
         logging.error("Draw lines failed: %s", e)
 
 @mcp.tool()
-def extrude(value: float,angle:float = 0.0):
+def extrude(value: float, angle: float = 0.0):
     """Extrudiert die letzte Skizze um einen angegebenen Wert.
     Du kannst auch einen Winkel angeben
     Returns body_id for tracking the created body.

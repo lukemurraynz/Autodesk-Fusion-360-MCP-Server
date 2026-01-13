@@ -49,11 +49,16 @@ bodies = list_bodies()
 ### 2. Apply Subtractive Features (BEFORE Shelling)
 
 ```python
-# Select the ZigzagFrame body for feature work
-frame_body = get_active_body()  # or find by name in list_bodies()
+# Get the ZigzagFrame body for feature work
+# Option 1: Use the body_id from when we created it
+frame_body_id = frame["body_id"]
 
-# Create sketch on front face of the frame
-sketch_on_face(body_index=3, face_index=0)  # ZigzagFrame front face
+# Option 2: Get it from list_bodies()
+bodies = list_bodies()
+frame_body = next((b for b in bodies['bodies'] if b['name'] == 'ZigzagFrame'), None)
+
+# Create sketch on front face of the frame (using index 3, or better: use frame_body)
+sketch_on_face(body_index=3, face_index=0)  # Front face
 
 # Draw zigzag pattern
 draw_lines(
@@ -77,9 +82,10 @@ zigzag_sketch = get_active_sketch()
 # Returns: {"success": True, "sketch_id": "...", "sketch_name": "Sketch1"}
 
 # Create pocket with explicit targeting (10mm = 1.0 cm deep)
+# Using the body_id we saved earlier
 pocket_result = pocket_recess(
     depth=1.0,
-    body_id=3,  # ZigzagFrame
+    body_id=frame_body_id,  # Using saved body_id, not hardcoded index
     sketch_id=zigzag_sketch["sketch_id"]
 )
 # Returns: {"success": True, "depth": 1.0, "sketch_name": "Sketch1", "body_name": "ZigzagFrame"}
@@ -88,7 +94,8 @@ pocket_result = pocket_recess(
 ### 3. Create Side Panel Recesses
 
 ```python
-# Create sketch on side face
+# Create sketch on side face (using frame body_id)
+# Note: For production code, use frame_body_id or look it up from list_bodies()
 sketch_on_face(body_index=3, face_index=2)  # Side face
 
 # Draw hexagonal panel recess
@@ -97,8 +104,12 @@ draw_polygon(sides=6, radius=3.0, x=0, y=0, z=0, plane="XY")
 # Get the sketch
 panel_sketch = get_active_sketch()
 
-# Create pocket (5mm = 0.5 cm deep)
-pocket_recess(depth=0.5, body_id=3, sketch_id=panel_sketch["sketch_id"])
+# Create pocket using the frame body_id
+pocket_recess(
+    depth=0.5,
+    body_id=frame_body_id,  # Using saved body_id
+    sketch_id=panel_sketch["sketch_id"]
+)
 ```
 
 ### 4. Apply Circular Pattern (Real Features, Not Cosmetic)
