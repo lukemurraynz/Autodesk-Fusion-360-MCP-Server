@@ -202,7 +202,9 @@ This MCP server includes specialized prompts for creating prop replicas as funct
 - Movie prop cases (e.g., futuristic devices)
 - Custom artistic designs
 
-**See [PROP_REPLICA_GUIDE.md](PROP_REPLICA_GUIDE.md) for detailed documentation, examples, and best practices.**
+**📖 Documentation:**
+- **New Users**: [PROP_REPLICA_QUICK_START.md](PROP_REPLICA_QUICK_START.md) - Get started in 5 minutes
+- **Detailed Guide**: [PROP_REPLICA_GUIDE.md](PROP_REPLICA_GUIDE.md) - Complete documentation with examples
 
 ---
 
