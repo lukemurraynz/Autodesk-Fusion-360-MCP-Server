@@ -171,6 +171,17 @@ Just open Claude, an ask for the FusionMCP
 
 ## 🛠️ Available Tools
 
+**NEW: Prop Modeling Enhancements** 🎯
+See [Prop Modeling Features](./examples/PROP_MODELING_FEATURES.md) for detailed documentation and [Stargate Console Example](./examples/stargate_console_example.md) for a complete workflow.
+
+Key new capabilities:
+- **Body Management**: `list_bodies()`, `get_active_body()`, `rename_body()`
+- **Sketch Management**: `list_sketches()`, `get_active_sketch()`, `activate_sketch()`, `close_sketch()`
+- **Enhanced Extrude**: Returns `body_id` for tracking
+- **Explicit Targeting**: `pocket_recess(depth, body_id, sketch_id)`
+- **Pattern Confirmation**: `circular_pattern()` returns instance count and pattern ID
+- **Edge-Selective Fillet**: `fillet_edges(radius, edges=[...])`
+
 ---
 
 ### ✏️ Sketching & Creation Tools
