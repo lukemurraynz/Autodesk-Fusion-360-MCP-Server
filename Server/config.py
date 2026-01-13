@@ -54,7 +54,25 @@ ENDPOINTS = {
     "get_active_sketch": f"{BASE_URL}/get_active_sketch",
     "activate_sketch": f"{BASE_URL}/activate_sketch",
     "close_sketch": f"{BASE_URL}/close_sketch",
-    
+
+    # NEW ENHANCED TOOLS - Phase 1-4
+    "get_sketch_status": f"{BASE_URL}/get_sketch_status",
+    "list_faces": f"{BASE_URL}/list_faces",
+    "pocket_recess_safe": f"{BASE_URL}/pocket_recess_safe",
+    "get_feature_history": f"{BASE_URL}/get_feature_history",
+    "find_face_by_property": f"{BASE_URL}/find_face_by_property",
+    "draw_rectangles_batch": f"{BASE_URL}/draw_rectangles_batch",
+    "pocket_smart": f"{BASE_URL}/pocket_smart",
+    "begin_transaction": f"{BASE_URL}/begin_transaction",
+    "commit_transaction": f"{BASE_URL}/commit_transaction",
+    "rollback_transaction": f"{BASE_URL}/rollback_transaction",
+    "get_operation_log": f"{BASE_URL}/get_operation_log",
+    "create_sketch_on_body_plane": f"{BASE_URL}/create_sketch_on_body_plane",
+    "validate_face_exists": f"{BASE_URL}/validate_face_exists",
+    "select_faces_by_semantic": f"{BASE_URL}/select_faces_by_semantic",
+    "clear_sketch": f"{BASE_URL}/clear_sketch",
+    "extrude_safe": f"{BASE_URL}/extrude_safe",
+
 }
 
 # Request Headers

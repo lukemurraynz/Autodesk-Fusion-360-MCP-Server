@@ -12,7 +12,7 @@ import config
 
 
 mcp = FastMCP("Fusion",
-              
+
               instructions =   """You are an extremely helpful assistant for Autodesk Fusion 360 CAD modeling.
                 You answer exclusively questions related to Fusion 360.
                 You may only use the tools defined in the prompt system.
@@ -41,62 +41,62 @@ mcp = FastMCP("Fusion",
 
                 **CRITICAL: Prop Modeling & Manufacturing Workflows**
                 This MCP is optimized for physical replica manufacturing, especially for props like the Stargate Atlantis Override Console.
-                
+
                 **Body Management (REQUIRED for Complex Props):**
                 - ALWAYS use list_bodies() to track multiple bodies
                 - Use rename_body() to name components: "HexColumn", "ZigzagFrame", "TopLid", "BasePlatform"
                 - Use get_active_body() to verify current body
                 - Multiple extrude() calls create STACKED SOLIDS (not overwrites)
                 - Each extrude() returns body_id for tracking
-                
+
                 **Sketch State Control (REQUIRED):**
                 - Use list_sketches() to see all sketches
                 - Use get_active_sketch() to verify current sketch
                 - Use activate_sketch(sketch_id) to select specific sketches
                 - Use close_sketch() before extrude/pocket operations
-                
+
                 **Subtractive Modeling Order (MANDATORY):**
                 - ALL pockets, recesses, slots, and cut-outs MUST be applied BEFORE shelling
                 - Never attempt to sketch on shelled bodies
                 - Never pocket into curved interior faces
                 - Order: Create solid → Apply features/pockets → Shell (if needed) → Fillet
-                
+
                 **Explicit Feature Targeting (REQUIRED):**
                 - pocket_recess(depth, body_id=0, sketch_id=2) - specify exact targets
                 - circular_pattern() returns {"applied": true, "instance_count": 6, "pattern_id": "..."}
                 - fillet_edges(radius, edges=[0,1,5,8]) - edge-selective filleting
                 - NEVER rely on implicit "last feature" - always specify IDs
-                
+
                 **Segmented Body Workflow Example:**
                 ```python
                 # Create stacked segments
                 base = extrude(2.0)  # Returns body_id
                 rename_body(base["body_id"], "BasePedestal")
-                
+
                 mid = extrude(60.0)
                 rename_body(mid["body_id"], "MidBody")
-                
+
                 frame = extrude(30.0)
                 rename_body(frame["body_id"], "ZigzagFrame")
-                
+
                 cap = extrude(10.0)
                 rename_body(cap["body_id"], "TopCap")
-                
+
                 # Verify bodies
                 bodies = list_bodies()
-                
+
                 # Apply features to specific body
                 sketch_on_face(body_index=2, face_index=0)
                 draw_lines(...)
                 pocket_recess(depth=0.1, body_id=2)
-                
+
                 # Pattern features (not just bodies)
                 pattern = circular_pattern(quantity=6, axis="Z", plane="XY")
                 # Returns: {"applied": true, "instance_count": 6}
-                
+
                 # Shell AFTER all features
                 shell_body(thickness=0.03, faceindex=0)
-                
+
                 # Edge-selective fillet (preserve sharp seams)
                 fillet_edges(radius=0.1, edges=[0, 2, 5])  # Only specific edges
                 fillet_edges(radius=0.05, edges=[10, 11])  # Different radius for cap
@@ -154,7 +154,7 @@ mcp = FastMCP("Fusion",
                 - **create_work_plane**: Create offset construction planes for complex geometries
                 - **project_edges**: Project body edges onto sketch planes for alignment
                 - **offset_surface**: Create offset surfaces for wall thickness or parallel faces
-                
+
                 **Pattern Best Practices:**
                 - Use rectangular_pattern for grid-like arrangements (specify plane, quantities, distances, axes)
                 - Use circular_pattern for radial arrangements (specify plane, quantity, axis)
@@ -214,7 +214,7 @@ def send_request(endpoint, data, headers):
             # If max retries reached, raise the exception
             if attempt == max_retries - 1:
                 raise
-            
+
             # Add delay before retry to give Fusion time to process
             time.sleep(config.RETRY_DELAY)
 
@@ -226,7 +226,7 @@ def send_request(endpoint, data, headers):
 def move_latest_body(x : float,y:float,z:float):
     """
     Du kannst den letzten Körper in Fusion 360 verschieben in x,y und z Richtung
-    
+
     """
     endpoint = config.ENDPOINTS["move_body"]
     payload = {
@@ -248,14 +248,14 @@ def create_thread(inside: bool, allsizes: int):
         #'1/4', '5/16', '3/8', '7/16', '1/2', '5/8', '3/4', '7/8', '1', '1 1/8', '1 1/4',
         # '1 3/8', '1 1/2', '1 3/4', '2', '2 1/4', '2 1/2', '2 3/4', '3', '3 1/2', '4', '4 1/2', '5')
         # allsizes = int value from 1 to 22
-    
+
     """
     try:
         endpoint = config.ENDPOINTS["threaded"]
         payload = {
             "inside": inside,
             "allsizes": allsizes,
-     
+
         }
         headers = config.HEADERS
         return send_request(endpoint, payload, headers)
@@ -440,10 +440,10 @@ def export_stl(name : str):
 @mcp.tool()
 def fillet_edges(radius: float, edges: list = None):
     """Erstellt eine Abrundung an den angegebenen Kanten.
-    
+
     :param radius: Fillet radius in cm
     :param edges: Optional list of edge indices to fillet. If None, attempts all edges.
-    
+
     For edge-selective filleting (recommended for props):
     - Specify edge indices as a list, e.g., edges=[0, 1, 5, 8]
     - This allows sharp vertical seams while softening specific edges
@@ -510,7 +510,7 @@ def draw_box(height_value:str, width_value:str, depth_value:str, x_value:float, 
     Ganz wichtg 10 ist 100mm in Fusion 360
     Du kannst die Ebene als String übergeben
     Depth ist die eigentliche höhe in z Richtung
-    Ein in der Luft schwebende Box machst du so: 
+    Ein in der Luft schwebende Box machst du so:
     {
     `plane`: `XY`,
     `x_value`: 5,
@@ -523,7 +523,7 @@ def draw_box(height_value:str, width_value:str, depth_value:str, x_value:float, 
     Das kannst du beliebig anpassen
 
     Beispiel: "XY", "YZ", "XZ"
-    
+
     """
     try:
         endpoint = config.ENDPOINTS["draw_box"]
@@ -552,7 +552,7 @@ def shell_body(thickness: float, faceindex: int):
     Du kannst den Faceindex als Integer übergeben
     WEnn du davor eine Box abgerundet hast muss die im klaren sein, dass du 20 neue Flächen hast.
     Die sind alle die kleinen abgerundeten
-    Falls du eine Box davor die Ecken verrundet hast, 
+    Falls du eine Box davor die Ecken verrundet hast,
     dann ist der Facinedex der großen Flächen mindestens 21
     Es kann immer nur der letzte Body geschält werde
 
@@ -570,7 +570,7 @@ def shell_body(thickness: float, faceindex: int):
         return send_request(endpoint, data, headers)
     except requests.RequestException as e:
         logging.error("Shell body failed: %s", e)
-        
+
 
 @mcp.tool()
 def draw_sphere(x: float, y: float, z: float, radius: float):
@@ -633,12 +633,12 @@ def boolean_operation(operation: str):
     Du kannst die Operation als String übergeben.
     Mögliche Werte sind: "cut", "join", "intersect"
     Wichtig ist, dass du vorher zwei Körper erstellt hast.
-    
+
     For segmented body support:
     - "join" combines multiple bodies into one (use for boolean_join)
     - "cut" subtracts one body from another
     - "intersect" keeps only the overlapping volume
-    
+
     Use list_bodies() to verify bodies before boolean operations.
     """
     try:
@@ -653,7 +653,7 @@ def boolean_operation(operation: str):
         raise
 
 
-      
+
 @mcp.tool()
 def draw_lines(points : list, plane : str):
     """
@@ -681,7 +681,7 @@ def extrude(value: float, angle: float = 0.0):
     """Extrudiert die letzte Skizze um einen angegebenen Wert.
     Du kannst auch einen Winkel angeben
     Returns body_id for tracking the created body.
-    
+
     """
     try:
         url = config.ENDPOINTS["extrude"]
@@ -760,7 +760,7 @@ def cut_extrude(depth :float):
     except requests.RequestException as e:
         logging.error("Cut extrude failed: %s", e)
         raise
-    
+
 @mcp.tool()
 def revolve(angle : float):
     """
@@ -769,7 +769,7 @@ def revolve(angle : float):
     Wir übergeben den Winkel als Float
     """
     try:
-        headers = config.HEADERS    
+        headers = config.HEADERS
         endpoint = config.ENDPOINTS["revolve"]
         data = {
             "angle": angle
@@ -778,7 +778,7 @@ def revolve(angle : float):
         return send_request(endpoint, data, headers)
 
     except requests.RequestException as e:
-        logging.error("Revolve failed: %s", e)  
+        logging.error("Revolve failed: %s", e)
         raise
 @mcp.tool()
 def draw_arc(point1 : list, point2 : list, point3 : list, plane : str):
@@ -842,7 +842,7 @@ def rectangular_pattern(plane: str, quantity_one: float, quantity_two: float, di
     Aus Gründen musst du distance immer mit einer 10 multiplizieren damit es in Fusion 360 stimmt.
     """
     try:
-       
+
         headers = config.HEADERS
         endpoint = config.ENDPOINTS["rectangular_pattern"]
         data = {
@@ -870,14 +870,14 @@ def circular_pattern(plane: str, quantity: float, axis: str):
     Die Achse gibt an, um welche Achse rotiert wird.
     Die Ebene gibt an, in welcher Ebene das Muster verteilt wird.
 
-    Beispiel: 
+    Beispiel:
     - quantity: 6.0 erstellt 6 Kopien gleichmäßig um 360° verteilt
     - axis: "Z" rotiert um die Z-Achse
     - plane: "XY" verteilt die Objekte in der XY-Ebene
 
     Das Feature wird auf das zuletzt erstellte/ausgewählte Objekt angewendet.
     Typische Anwendungen: Schraubenlöcher in Kreisform, Zahnrad-Zähne, Lüftungsgitter, dekorative Muster.
-    
+
     Returns detailed confirmation:
     {
       "applied": true,
@@ -937,7 +937,7 @@ def draw2Dcircle(radius: float, x: float, y: float, z: float, plane: str = "XY")
 
     KRITISCH - Welche Koordinate für "nach oben":
     - XY-Ebene: z erhöhen = nach oben
-    - YZ-Ebene: x erhöhen = nach oben  
+    - YZ-Ebene: x erhöhen = nach oben
     - XZ-Ebene: y erhöhen = nach oben
 
     Gib immer JSON SO:
@@ -992,12 +992,12 @@ def pocket_recess(depth: float, face_index: int = None, body_id = None, sketch_i
     Creates a pocket/recess in an existing body by cutting a sketch.
     Now supports explicit body_id and sketch_id for precise targeting.
     This is a critical tool for creating depressions, recesses, and pockets in bodies.
-    
+
     :param depth: The depth of the pocket/recess (in cm, 1 unit = 1 cm = 10mm)
     :param face_index: Optional face index (legacy parameter)
     :param body_id: Optional body ID, index, or name to cut into (for explicit targeting)
     :param sketch_id: Optional sketch ID or index to use for cutting (for explicit targeting)
-    
+
     Example:
     - To create a 5mm deep pocket: depth = 0.5
     - First draw a 2D sketch (circle, rectangle, polygon), then call this tool
@@ -1023,10 +1023,10 @@ def sketch_on_face(body_index: int = -1, face_index: int = 0):
     """
     Creates a new sketch directly on a face of an existing body.
     This is critical for sketching on angled or curved surfaces.
-    
+
     :param body_index: Index of the body (-1 for last body, 0 for first body, etc.)
     :param face_index: Index of the face to sketch on (0 for first face, 1 for second, etc.)
-    
+
     Important: After creating this sketch, you can draw shapes on it, then extrude or cut.
     Face indices:
     - For a box: face 0-5 are the six faces
@@ -1050,11 +1050,11 @@ def create_work_plane(plane_type: str, offset_distance: float, reference_index: 
     """
     Creates a construction/work plane for advanced sketching.
     This allows you to create reference planes offset from existing geometry.
-    
+
     :param plane_type: Type of plane ('offset_xy', 'offset_xz', 'offset_yz', 'face_offset')
     :param offset_distance: Distance to offset the plane (in cm)
     :param reference_index: Face index for 'face_offset' type
-    
+
     Examples:
     - Create a plane 5cm above XY: plane_type='offset_xy', offset_distance=5.0
     - Create a plane offset from a face: plane_type='face_offset', offset_distance=2.0, reference_index=0
@@ -1078,10 +1078,10 @@ def project_edges(body_index: int = None):
     """
     Projects edges from a body onto the current sketch plane.
     This allows you to reference existing geometry in your sketch.
-    
+
     :param body_index: Index of body to project from (None for last body)
-    
-    Important: Create a sketch first (like sketch_on_face or on a plane), 
+
+    Important: Create a sketch first (like sketch_on_face or on a plane),
     then call this to project edges for reference.
     """
     try:
@@ -1101,14 +1101,14 @@ def draw_polygon(sides: int, radius: float, x: float, y: float, z: float, plane:
     """
     Draws a regular polygon with the specified number of sides.
     Perfect for creating hexagons (6 sides), pentagons (5 sides), octagons (8 sides), etc.
-    
+
     :param sides: Number of sides (3 for triangle, 6 for hexagon, 8 for octagon, etc.)
     :param radius: Radius of the circumscribed circle (in cm)
     :param x: X coordinate of center
     :param y: Y coordinate of center
     :param z: Z coordinate of center
     :param plane: Plane to draw on ("XY", "XZ", "YZ")
-    
+
     Example for a hexagon:
     - sides=6, radius=5.0 creates a hexagon with 5cm radius
     """
@@ -1134,10 +1134,10 @@ def offset_surface(distance: float, face_index: int = 0):
     """
     Creates an offset surface by offsetting faces of a body.
     Useful for creating parallel surfaces and wall thicknesses.
-    
+
     :param distance: Offset distance (positive or negative, in cm)
     :param face_index: Index of the face to offset
-    
+
     Example: distance=1.0 offsets the face by 1cm outward
     """
     try:
@@ -1157,10 +1157,10 @@ def offset_surface(distance: float, face_index: int = 0):
 def mirror_feature(mirror_plane: str, body_index: int = None):
     """
     Mirrors a body across a plane for creating symmetric features.
-    
+
     :param mirror_plane: Plane to mirror across ("XY", "XZ", "YZ")
     :param body_index: Index of body to mirror (None for last body)
-    
+
     Example: mirror_plane="XY" mirrors the body across the XY plane
     This is useful for creating symmetric panels and features.
     """
@@ -1182,7 +1182,7 @@ def list_bodies():
     """
     Lists all bodies in the current design with their IDs, names, and properties.
     Essential for tracking multiple bodies in segmented prop modeling.
-    
+
     Returns:
     {
       "success": true,
@@ -1219,10 +1219,10 @@ def get_active_body():
 def rename_body(body_id, new_name: str):
     """
     Renames a body for better organization in complex models.
-    
+
     :param body_id: Body ID (string), index (int), or current name
     :param new_name: New name for the body (e.g., "HexColumn", "ZigzagFrame", "TopLid")
-    
+
     Essential for tracking components like:
     - HexColumn
     - ZigzagFrame
@@ -1247,7 +1247,7 @@ def list_sketches():
     """
     Lists all sketches in the current design with their IDs, names, and properties.
     Useful for managing multiple sketches in complex modeling workflows.
-    
+
     Returns:
     {
       "success": true,
@@ -1285,7 +1285,7 @@ def activate_sketch(sketch_id):
     """
     Activates a sketch for editing by its ID or index.
     Validates the sketch exists and makes it visible if needed.
-    
+
     :param sketch_id: Sketch ID or index to activate
     """
     try:
@@ -1305,9 +1305,9 @@ def close_sketch(sketch_id = None):
     """
     Closes/deactivates a sketch.
     If sketch_id is None, closes the currently active sketch.
-    
+
     :param sketch_id: Optional sketch ID or index to close
-    
+
     Note: All extrude and pocket operations should be called with sketches closed.
     """
     try:
@@ -1330,7 +1330,7 @@ def weingals():
     - Benutze Tool: draw_lines
     - Ebene: XY
     - Punkte: [[0, 0], [0, -8], [1.5, -8], [1.5, -7], [0.3, -7], [0.3, -2], [3, -0.5], [3, 0], [0, 0]]
-    
+
     SCHRITT 2: Drehe das Profil
     - Benutze Tool: revolve
     - Winkel: 360
@@ -1347,21 +1347,21 @@ def magnet():
     - Höhe: 0.3
     - Position: x=0, y=0, z=0.18
     - Ebene: XY
-    
+
     SCHRITT 2: Kleiner Zylinder unten
     - Benutze Tool: draw_cylinder
     - Radius: 1.415
     - Höhe: 0.18
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
+
     SCHRITT 3: Loch in die Mitte bohren
     - Benutze Tool: draw_holes
     - Punkte: [[0, 0]]
     - Durchmesser (width): 1.0
     - Tiefe (depth): 0.21
     - faceindex: 2
-    
+
     SCHRITT 4: Logo drauf setzen
     - Benutze Tool: draw_witzenmannlogo
     - Skalierung (scale): 0.1
@@ -1374,40 +1374,40 @@ def dna():
     return """
     Benutze nur die tools : draw2Dcircle , spline , sweep
     Erstelle eine DNA Doppelhelix in Fusion 360
-    
+
     DNA STRANG 1:
-    
-    SCHRITT 1: 
+
+    SCHRITT 1:
     - Benutze Tool: draw2Dcircle
     - Radius: 0.5
     - Position: x=3, y=0, z=0
     - Ebene: XY
-    
-    SCHRITT 2: 
+
+    SCHRITT 2:
     - Benutze Tool: spline
     - Ebene: XY
     - Punkte: [[3,0,0], [2.121,2.121,6.25], [0,3,12.5], [-2.121,2.121,18.75], [-3,0,25], [-2.121,-2.121,31.25], [0,-3,37.5], [2.121,-2.121,43.75], [3,0,50]]
-    
+
     SCHRITT 3: Kreis an der Linie entlang ziehen
     - Benutze Tool: sweep
-    
-    
+
+
     DNA STRANG 2:
-    
-    SCHRITT 4: 
+
+    SCHRITT 4:
     - Benutze Tool: draw2Dcircle
     - Radius: 0.5
     - Position: x=-3, y=0, z=0
     - Ebene: XY
-    
-    SCHRITT 5: 
+
+    SCHRITT 5:
     - Benutze Tool: spline
     - Ebene: XY
     - Punkte: [[-3,0,0], [-2.121,-2.121,6.25], [0,-3,12.5], [2.121,-2.121,18.75], [3,0,25], [2.121,2.121,31.25], [0,3,37.5], [-2.121,2.121,43.75], [-3,0,50]]
-    
+
     SCHRITT 6: Zweiten Kreis an der zweiten Linie entlang ziehen
     - Benutze Tool: sweep
-    
+
     FERTIG: Jetzt hast du eine DNA Doppelhelix!
     """
 
@@ -1415,30 +1415,30 @@ def dna():
 @mcp.prompt()
 def flansch():
     return """
-    SCHRITT 1: 
+    SCHRITT 1:
     - Benutze Tool: draw_cylinder
     - Denk dir sinnvolle Maße aus (z.B. Radius: 5, Höhe: 1)
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
+
     SCHRITT 2: Ln
     - Benutze Tool: draw_holes
     - Mache 6-8 Löcher im Kreis verteilt
     - Tiefe: Mehr als die Zylinderhöhe (damit sie durchgehen)
     - faceindex: 1
     - Beispiel Punkte für 6 Löcher: [[4,0], [2,3.46], [-2,3.46], [-4,0], [-2,-3.46], [2,-3.46]]
-    
+
     SCHRITT 3: Frage den Nutzer
     - "Soll in der Mitte auch ein Loch sein?"
-    
+
     WENN JA:
-    SCHRITT 4: 
+    SCHRITT 4:
     - Benutze Tool: draw2Dcircle
     - Radius: 2 (oder was der Nutzer will)
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
-    SCHRITT 5: 
+
+    SCHRITT 5:
     - Benutze Tool: cut_extrude
     - Tiefe: +2 (pos Wert! Größer als Zylinderhöhe)
     """
@@ -1447,39 +1447,39 @@ def flansch():
 @mcp.prompt()
 def vase():
     return """
-    SCHRITT 1: 
+    SCHRITT 1:
     - Benutze Tool: draw2Dcircle
     - Radius: 2.5
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
-    SCHRITT 2: 
+
+    SCHRITT 2:
     - Benutze Tool: draw2Dcircle
     - Radius: 1.5
     - Position: x=0, y=0, z=4
     - Ebene: XY
-    
+
     SCHRITT 3:
     - Benutze Tool: draw2Dcircle
     - Radius: 3
     - Position: x=0, y=0, z=8
     - Ebene: XY
-    
-    SCHRITT 4: 
+
+    SCHRITT 4:
     - Benutze Tool: draw2Dcircle
     - Radius: 2
     - Position: x=0, y=0, z=12
     - Ebene: XY
-    
-    SCHRITT 5: 
+
+    SCHRITT 5:
     - Benutze Tool: loft
     - sketchcount: 4
-    
+
     SCHRITT 6: Vase aushöhlen (nur Wände übrig lassen)
     - Benutze Tool: shell_body
     - Wandstärke (thickness): 0.3
     - faceindex: 1
-    
+
     FERTIG: Jetzt hast du eine schöne Designer-Vase!
     """
 
@@ -1487,14 +1487,14 @@ def vase():
 @mcp.prompt()
 def teil():
     return """
-    SCHRITT 1: 
+    SCHRITT 1:
     - Benutze Tool: draw_box
     - Breite (width_value): "10"
     - Höhe (height_value): "10"
     - Tiefe (depth_value): "0.5"
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
+
     SCHRITT 2: Kleine Löcher bohren
     - Benutze Tool: draw_holes
     - 8 Löcher total: 4 in den Ecken + 4 näher zur Mitte
@@ -1502,25 +1502,25 @@ def teil():
     - Durchmesser (width): 0.5
     - Tiefe (depth): 0.2
     - faceindex: 4
-    
+
     SCHRITT 3: Kreis in der Mitte zeichnen
     - Benutze Tool: draw2Dcircle
     - Radius: 1
     - Position: x=0, y=0, z=0
     - Ebene: XY
-    
-    SCHRITT 4: 
+
+    SCHRITT 4:
     - Benutze Tool: cut_extrude
     - Tiefe: +10 (MUSS Positiv SEIN!)
-    
+
     SCHRITT 5: Sage dem Nutzer
     - "Bitte wähle jetzt in Fusion 360 die innere Fläche des mittleren Lochs aus"
-    
+
     SCHRITT 6: Gewinde erstellen
     - Benutze Tool: create_thread
     - inside: True (Innengewinde)
     - allsizes: 10 (für 1/4 Zoll Gewinde)
-    
+
     FERTIG: Teil mit Löchern und Gewinde ist fertig!
     """
 
@@ -1529,15 +1529,585 @@ def teil():
 def kompensator():
     prompt = """
                 Bau einen Kompensator in Fusion 360 mit dem MCP: Lösche zuerst alles.
-                Erstelle dann ein dünnwandiges Rohr: Zeichne einen 2D-Kreis mit Radius 5 in der XY-Ebene bei z=0, 
+                Erstelle dann ein dünnwandiges Rohr: Zeichne einen 2D-Kreis mit Radius 5 in der XY-Ebene bei z=0,
                 extrudiere ihn thin mit distance 10 und thickness 0.1. Füge dann 8 Ringe nacheinander übereinander hinzu (Erst Kreis dann Extrusion 8 mal): Für jeden Ring in
                 den Höhen z=1 bis z=8 zeichne einen 2D-Kreis mit Radius 5.1 in der XY-Ebene und extrudiere ihn thin mit distance 0.5 und thickness 0.5.
                 Verwende keine boolean operations, lass die Ringe als separate Körper. Runde anschließend die Kanten mit Radius 0.2 ab.
                 Mache schnell!!!!!!
-    
+
                 """
     return prompt
 
+
+#########################################################################################
+### NEW ENHANCED TOOLS - Phase 1-4 (MCP Tool Definitions) ###
+#########################################################################################
+
+@mcp.tool()
+def get_sketch_status(sketch_id: str = None, include_geometry: bool = True):
+    """
+    Validate sketch state and content before closing it.
+
+    **CRITICAL**: Use this to verify geometry was actually accepted before proceeding.
+    Returns profile count, segment count, and validity status.
+
+    :param sketch_id: Sketch ID or index (None = current sketch)
+    :param include_geometry: Include detailed geometry analysis
+    :return: Validation result with profile count and geometry status
+
+    **Usage Example:**
+    ```python
+    # Draw geometry
+    draw_lines(points=[...])
+
+    # VERIFY before closing
+    status = get_sketch_status()
+    if not status["geometry_valid"]:
+        print(f"ERROR: {status['error_message']}")
+        return
+
+    if status["profile_count"] != 5:
+        print("Expected 5 rectangles")
+        return
+
+    close_sketch()  # Now safe to close
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["get_sketch_status"]
+        payload = {
+            "sketch_id": sketch_id,
+            "include_geometry": include_geometry
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("get_sketch_status failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def list_faces(body_id):
+    """
+    Query all faces of a body with geometric properties (not just indices).
+
+    **WHY NEEDED**: Face indices change after boolean operations. This provides semantic understanding.
+
+    Returns face type, area, normal vector, position, orientation (front/back/top/bottom), and adjacent faces.
+
+    :param body_id: Body ID, index, or name
+    :return: List of all faces with properties
+
+    **Usage Example:**
+    ```python
+    # Instead of hardcoding face_index=1
+    faces = list_faces(body_id=1)
+
+    # Find front face (normal pointing in +Y direction)
+    front_face = next(f for f in faces["faces"] if f["normal"] == [0, 1, 0])
+    sketch_on_face(body_id=1, face_index=front_face["index"])
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["list_faces"]
+        payload = {"body_id": body_id}
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("list_faces failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def pocket_recess_safe(body_id, sketch_id, depth: float, operation: str = "cut",
+                       validate_before: bool = True, validate_after: bool = True):
+    """
+    Create pocket with complete validation and result confirmation.
+
+    **CRITICAL**: Returns success=true/false with actual volume changes. No more silent failures!
+
+    :param body_id: Body ID, index, or name to cut into
+    :param sketch_id: Sketch ID or index to use for cutting
+    :param depth: Depth of pocket in cm (1 unit = 1 cm = 10mm)
+    :param operation: "cut", "join", or "intersect"
+    :param validate_before: Validate sketch has profiles before cutting
+    :param validate_after: Verify volume actually changed
+    :return: Detailed result with volume changes and validation status
+
+    **Usage Example:**
+    ```python
+    # Create pocket with guaranteed validation
+    result = pocket_recess_safe(
+        body_id=1,
+        sketch_id=5,
+        depth=0.5,
+        validate_before=True,
+        validate_after=True
+    )
+
+    # Check result before proceeding
+    if not result["success"]:
+        print(f"ERROR: {result['error']}")
+        undo()
+    else:
+        print(f"Pocket applied: {result['volume_removed']} cm³ removed")
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["pocket_recess_safe"]
+        payload = {
+            "body_id": body_id,
+            "sketch_id": sketch_id,
+            "depth": depth,
+            "operation": operation,
+            "validate_before": validate_before,
+            "validate_after": validate_after
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("pocket_recess_safe failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def get_feature_history(body_id, include_parameters: bool = True, include_errors: bool = True):
+    """
+    List all features (extrudes, pockets, fillets, etc.) applied to a body.
+
+    **WHY NEEDED**: Verify which operations actually succeeded. Audit trail for multi-step builds.
+
+    :param body_id: Body ID, index, or name
+    :param include_parameters: Include feature parameters
+    :param include_errors: Include error messages for failed features
+    :return: Complete feature history with status and errors
+
+    **Usage Example:**
+    ```python
+    # Build complex geometry
+    extrude(value=20)
+    pocket_recess(body_id=1, depth=0.5)
+    pocket_recess(body_id=1, depth=0.3)  # Might fail
+
+    # Audit what actually succeeded
+    history = get_feature_history(body_id=1)
+
+    failed_features = [f for f in history["features"] if f["status"] == "failed"]
+    if failed_features:
+        print(f"WARNING: {len(failed_features)} features failed")
+        for f in failed_features:
+            print(f"  - {f['name']}: {f['error_message']}")
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["get_feature_history"]
+        payload = {
+            "body_id": body_id,
+            "include_parameters": include_parameters,
+            "include_errors": include_errors
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("get_feature_history failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def find_face_by_property(body_id, selector: str = None, normal: list = None,
+                         area_range: dict = None, position: dict = None,
+                         return_all_matches: bool = False):
+    """
+    Locate face(s) by geometric criteria instead of fragile indices.
+
+    **WHY NEEDED**: Hardcoded face_index=1 breaks after boolean operations. Semantic selection is robust.
+
+    :param body_id: Body ID, index, or name
+    :param selector: "front", "back", "top", "bottom", "left", "right", "largest", "smallest"
+    :param normal: Normal vector [x, y, z] (e.g., [0, 1, 0] for front face)
+    :param area_range: {"min": float, "max": float}
+    :param position: {"point": [x, y, z], "tolerance": float}
+    :param return_all_matches: Return all matching faces (default: first match only)
+    :return: Matching face(s) with indices
+
+    **Usage Example:**
+    ```python
+    # Find front face semantically (no hardcoded index)
+    front = find_face_by_property(body_id=1, selector="front")
+    front_face_index = front["primary_face_index"]
+
+    # Create sketch on front face (works even after topology changes)
+    sketch_on_face(body_id=1, face_index=front_face_index)
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["find_face_by_property"]
+        payload = {
+            "body_id": body_id,
+            "selector": selector,
+            "normal": normal,
+            "area_range": area_range,
+            "position": position,
+            "return_all_matches": return_all_matches
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("find_face_by_property failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def draw_rectangles_batch(plane: str, rectangles: list):
+    """
+    Draw multiple rectangles in a single sketch in one operation.
+
+    **WHY NEEDED**: Sequential rectangle draws accumulate errors. Batch reduces failure points.
+
+    :param plane: "XY", "YZ", or "XZ"
+    :param rectangles: List of rectangle dicts with x_min, x_max, y_min, y_max, z_center
+    :return: Sketch ID and success count
+
+    **Usage Example:**
+    ```python
+    # Define all 5 vent bands at once
+    vent_bands = [
+        {"x_min": -10, "x_max": 10, "y_min": 3, "y_max": 4, "z_center": 4},
+        {"x_min": -10, "x_max": 10, "y_min": 3, "y_max": 4, "z_center": 8},
+        {"x_min": -10, "x_max": 10, "y_min": 3, "y_max": 4, "z_center": 12},
+        {"x_min": -10, "x_max": 10, "y_min": 3, "y_max": 4, "z_center": 16},
+        {"x_min": -10, "x_max": 10, "y_min": 3, "y_max": 4, "z_center": 20},
+    ]
+
+    sketch_on_face(body_id=1, face_index=1)
+    result = draw_rectangles_batch(plane="XY", rectangles=vent_bands)
+    assert result["rectangles_failed"] == 0, "Some rectangles failed"
+    close_sketch()
+    pocket_recess_safe(body_id=1, depth=0.5)  # Creates 5 pockets at once
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["draw_rectangles_batch"]
+        payload = {
+            "plane": plane,
+            "rectangles": rectangles
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("draw_rectangles_batch failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def pocket_smart(body_id, sketch_id, depth_mode: str, depth_value: float,
+                from_face: str = "sketch_plane", snap_to_geometry: bool = False,
+                validate_after: bool = True):
+    """
+    Create pocket with intelligent depth calculation.
+
+    **DEPTH MODES:**
+    - "absolute": Cut exactly depth_value cm
+    - "through": Cut all the way through (ignores depth_value)
+    - "wall_thickness": Leave exactly depth_value cm of material remaining
+    - "percentage": Cut depth_value% of the current thickness
+
+    :param body_id: Body ID, index, or name
+    :param sketch_id: Sketch ID or index
+    :param depth_mode: "absolute", "through", "wall_thickness", or "percentage"
+    :param depth_value: Depth value (interpretation depends on mode)
+    :param from_face: "top", "bottom", or "sketch_plane"
+    :param snap_to_geometry: Snap to internal geometry
+    :param validate_after: Validate result
+    :return: Result with calculated depth
+
+    **Usage Example:**
+    ```python
+    # Old way: manually calculate depth
+    pocket_recess_safe(body_id=1, depth=0.82)  # Must calculate manually
+
+    # New way: specify desired wall thickness
+    pocket_smart(
+        body_id=1,
+        sketch_id=5,
+        depth_mode="wall_thickness",
+        depth_value=0.3  # MCP calculates the cut depth
+    )
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["pocket_smart"]
+        payload = {
+            "body_id": body_id,
+            "sketch_id": sketch_id,
+            "depth_mode": depth_mode,
+            "depth_value": depth_value,
+            "from_face": from_face,
+            "snap_to_geometry": snap_to_geometry,
+            "validate_after": validate_after
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("pocket_smart failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def begin_transaction(transaction_id: str, description: str = "",
+                     auto_validate: bool = True, auto_rollback_on_error: bool = False):
+    """
+    Begin a transaction to group multiple operations with atomic commit/rollback.
+
+    **WHY NEEDED**: One failed operation ruins entire sequence. Transactions enable safe multi-step builds.
+
+    :param transaction_id: Unique transaction ID
+    :param description: Optional description
+    :param auto_validate: Auto-validate each step
+    :param auto_rollback_on_error: Auto-rollback on any error
+    :return: Transaction confirmation
+
+    **Usage Example:**
+    ```python
+    # Start transaction
+    begin_transaction("lower_vent_segment")
+
+    # Execute sequence
+    sketch_on_face(body_id="body_1", face_id="front")
+    draw_rectangles_batch(plane="XY", rectangles=vent_bands)
+    close_sketch()
+    result = pocket_recess_safe(body_id="body_1", depth=0.5)
+
+    # Commit or rollback
+    if not result["success"]:
+        rollback_transaction("lower_vent_segment")
+    else:
+        commit_transaction("lower_vent_segment")
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["begin_transaction"]
+        payload = {
+            "transaction_id": transaction_id,
+            "description": description,
+            "auto_validate": auto_validate,
+            "auto_rollback_on_error": auto_rollback_on_error
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("begin_transaction failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def commit_transaction(transaction_id: str, force: bool = False):
+    """
+    Commit a transaction atomically.
+
+    :param transaction_id: Transaction ID to commit
+    :param force: Force commit even if validation fails
+    :return: Commit result with operation summary
+    """
+    try:
+        endpoint = config.ENDPOINTS["commit_transaction"]
+        payload = {
+            "transaction_id": transaction_id,
+            "force": force
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("commit_transaction failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def rollback_transaction(transaction_id: str):
+    """
+    Rollback a transaction (undo all operations).
+
+    :param transaction_id: Transaction ID to rollback
+    :return: Rollback result
+    """
+    try:
+        endpoint = config.ENDPOINTS["rollback_transaction"]
+        payload = {"transaction_id": transaction_id}
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("rollback_transaction failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def get_operation_log(last_n_operations: int = 20, body_id = None,
+                     operation_type: str = None, status_filter: str = None):
+    """
+    Access detailed operation history for debugging.
+
+    **WHY NEEDED**: Silent failures are invisible. This provides complete audit trail.
+
+    :param last_n_operations: Number of recent operations to return
+    :param body_id: Filter by body ID
+    :param operation_type: Filter by operation type
+    :param status_filter: "success", "warning", "failed", or "all"
+    :return: Operation log with timestamps and state changes
+
+    **Usage Example:**
+    ```python
+    # Something went wrong
+    log = get_operation_log(status_filter="failed")
+
+    if log["operation_count"] > 0:
+        print("Failed operations:")
+        for op in log["operations"]:
+            print(f"  {op['operation']}: {op['error_message']}")
+    ```
+    """
+    try:
+        endpoint = config.ENDPOINTS["get_operation_log"]
+        payload = {
+            "last_n_operations": last_n_operations,
+            "body_id": body_id,
+            "operation_type": operation_type,
+            "status_filter": status_filter
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("get_operation_log failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def create_sketch_on_body_plane(body_id, plane: str, z_offset: float = 0, name: str = None):
+    """
+    Create sketch directly on XY/YZ/XZ plane without face dependency.
+
+    :param body_id: Body ID
+    :param plane: "XY", "YZ", or "XZ"
+    :param z_offset: Offset from plane in cm
+    :param name: Optional sketch name
+    :return: Sketch ID
+    """
+    try:
+        endpoint = config.ENDPOINTS["create_sketch_on_body_plane"]
+        payload = {
+            "body_id": body_id,
+            "plane": plane,
+            "z_offset": z_offset,
+            "name": name
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("create_sketch_on_body_plane failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def validate_face_exists(body_id, face_index: int):
+    """
+    Check if face index is still valid after topology changes.
+
+    **WHY NEEDED**: After pockets/booleans, face indices change. Validate before using.
+
+    :param body_id: Body ID
+    :param face_index: Face index to validate
+    :return: Validation result with suggestions
+    """
+    try:
+        endpoint = config.ENDPOINTS["validate_face_exists"]
+        payload = {
+            "body_id": body_id,
+            "face_index": face_index
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("validate_face_exists failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def select_faces_by_semantic(body_id, selectors: list):
+    """
+    Batch select multiple faces using semantic names.
+
+    :param body_id: Body ID
+    :param selectors: List of selectors (e.g., ["front", "back", "top"])
+    :return: Selected faces
+    """
+    try:
+        endpoint = config.ENDPOINTS["select_faces_by_semantic"]
+        payload = {
+            "body_id": body_id,
+            "selectors": selectors
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("select_faces_by_semantic failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def clear_sketch(sketch_id = None):
+    """
+    Safely clear active sketch without closing it.
+
+    **WHY NEEDED**: If geometry fails, erase and restart without closing bad sketch.
+
+    :param sketch_id: Sketch ID (None = current sketch)
+    :return: Clear result
+    """
+    try:
+        endpoint = config.ENDPOINTS["clear_sketch"]
+        payload = {"sketch_id": sketch_id}
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("clear_sketch failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def extrude_safe(value: float, sketch_id, body_id, direction: str = "normal",
+                validate_before: bool = True, validate_after: bool = True):
+    """
+    Extrude with full pre/post validation.
+
+    **WHY NEEDED**: Ensure sketch is valid and extrusion succeeds.
+
+    :param value: Extrusion distance in cm
+    :param sketch_id: Sketch ID
+    :param body_id: Body ID
+    :param direction: "normal", "both", or "symmetric"
+    :param validate_before: Validate sketch before extruding
+    :param validate_after: Verify volume changed
+    :return: Detailed result with volume changes
+    """
+    try:
+        endpoint = config.ENDPOINTS["extrude_safe"]
+        payload = {
+            "value": value,
+            "sketch_id": sketch_id,
+            "body_id": body_id,
+            "direction": direction,
+            "validate_before": validate_before,
+            "validate_after": validate_after
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("extrude_safe failed: %s", e)
+        raise
+
+
+#########################################################################################
+### END OF NEW ENHANCED TOOLS ###
+#########################################################################################
 
 
 if __name__ == "__main__":
