@@ -4180,8 +4180,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"message": "Scale body started"}).encode('utf-8'))
 
             elif path == '/draw_cylinder':
-                radius = float(data.get('radius'))
-                height = float(data.get('height'))
+                radius = float(data.get('radius', 1.0))
+                height = float(data.get('height', 1.0))
                 x = float(data.get('x',0))
                 y = float(data.get('y',0))
                 z = float(data.get('z',0))
@@ -4213,7 +4213,7 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == '/extrude_last_sketch':
                 value = float(data.get('value',1.0)) #1.0 as default
-                taperangle = float(data.get('taperangle')) #0.0 as default
+                taperangle = float(data.get('taperangle', 0.0)) #0.0 as default
                 task_queue.put(('extrude_last_sketch', value,taperangle))
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
@@ -4333,7 +4333,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"message": "Cut Extrude wird erstellt"}).encode('utf-8'))
 
             elif path == '/circular_pattern':
-                quantity = float(data.get('quantity',))
+                quantity = float(data.get('quantity', 6.0))
                 axis = str(data.get('axis',"X"))
                 plane = str(data.get('plane', 'XY'))  # 'XY', 'XZ', 'YZ'
                 task_queue.put(('circular_pattern',quantity,axis,plane))
@@ -4653,7 +4653,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/pocket_recess_safe':
                 body_id = data.get('body_id')
                 sketch_id = data.get('sketch_id')
-                depth = float(data.get('depth'))
+                depth = float(data.get('depth', 0.5))
                 operation = data.get('operation', 'cut')
                 validate_before = data.get('validate_before', True)
                 validate_after = data.get('validate_after', True)
@@ -4725,7 +4725,7 @@ class Handler(BaseHTTPRequestHandler):
                 body_id = data.get('body_id')
                 sketch_id = data.get('sketch_id')
                 depth_mode = data.get('depth_mode', 'absolute')
-                depth_value = float(data.get('depth_value'))
+                depth_value = float(data.get('depth_value', 0.5))
                 from_face = data.get('from_face', 'sketch_plane')
                 snap_to_geometry = data.get('snap_to_geometry', False)
                 validate_after = data.get('validate_after', True)
@@ -4823,7 +4823,7 @@ class Handler(BaseHTTPRequestHandler):
 
             elif path == '/validate_face_exists':
                 body_id = data.get('body_id')
-                face_index = int(data.get('face_index'))
+                face_index = int(data.get('face_index', 0))
                 if body_id is not None and face_index is not None:
                     task_queue.put(('validate_face_exists', body_id, face_index))
                     self.send_response(200)
@@ -4863,7 +4863,7 @@ class Handler(BaseHTTPRequestHandler):
                 }).encode('utf-8'))
 
             elif path == '/extrude_safe':
-                value = float(data.get('value'))
+                value = float(data.get('value', 1.0))
                 sketch_id = data.get('sketch_id')
                 body_id = data.get('body_id')
                 direction = data.get('direction', 'normal')
@@ -4900,6 +4900,12 @@ def run(context):
     try:
         app = adsk.core.Application.get()
         ui = app.userInterface
+
+        # Check if a document is active before accessing activeProduct
+        if not app.activeDocument:
+            ui.messageBox("Kein aktives Dokument geöffnet! Bitte öffnen oder erstellen Sie ein Design.")
+            return
+
         design = adsk.fusion.Design.cast(app.activeProduct)
 
         if design is None:
