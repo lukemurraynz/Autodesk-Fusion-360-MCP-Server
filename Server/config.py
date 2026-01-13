@@ -73,6 +73,11 @@ ENDPOINTS = {
     "clear_sketch": f"{BASE_URL}/clear_sketch",
     "extrude_safe": f"{BASE_URL}/extrude_safe",
 
+    # PROP PERFECTION TOOLS
+    "chamfer_edges": f"{BASE_URL}/chamfer_edges",
+    "split_body": f"{BASE_URL}/split_body",
+    "scale_body": f"{BASE_URL}/scale_body",
+
 }
 
 # Request Headers

@@ -2106,6 +2106,200 @@ def extrude_safe(value: float, sketch_id, body_id, direction: str = "normal",
 
 
 #########################################################################################
+### PROP PERFECTION TOOLS ###
+#########################################################################################
+
+@mcp.tool()
+def chamfer_edges(distance: float, edges: list = None, angle: float = 45.0):
+    """
+    Create angled beveled edges (chamfers) on specified edges.
+    Unlike fillets (rounded), chamfers create flat angled surfaces.
+
+    **WHY NEEDED**: Props often have sharp beveled edges, not rounded fillets.
+    Perfect for creating the angled edges on the Stargate console panels.
+
+    :param distance: Chamfer distance in cm (how far from edge the bevel extends)
+    :param edges: List of edge indices to chamfer, or None for all edges
+    :param angle: Chamfer angle in degrees (default 45°)
+    :return: Chamfer result with success status
+
+    **Usage Example:**
+    ```python
+    # 45° chamfer on top octagonal frame
+    result = chamfer_edges(distance=0.5, edges=[20, 21, 22, 23], angle=45)
+    print(f"Chamfered {result['successful_chamfers']} edges")
+
+    # Angled bevel on base edges (60° angle)
+    chamfer_edges(distance=0.3, edges=[0, 1, 2, 3, 4, 5], angle=60)
+    ```
+
+    **Returns:**
+    ```json
+    {
+      "success": true,
+      "successful_chamfers": 4,
+      "failed_edges": 0,
+      "distance": 0.5,
+      "angle": 45.0,
+      "message": "Successfully chamfered 4 edge(s)"
+    }
+    ```
+
+    **Best Practices:**
+    - Use chamfer for sharp, angular edges (consoles, mechanical parts)
+    - Use fillet for smooth, organic edges (ergonomic handles)
+    - Specify edge indices for selective chamfering
+    - Apply chamfers AFTER all pockets/recesses to avoid edge breakage
+    """
+    try:
+        endpoint = config.ENDPOINTS["chamfer_edges"]
+        payload = {
+            "distance": distance,
+            "edges": edges,
+            "angle": angle
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("chamfer_edges failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def split_body(body_id = None, split_tool: str = "XY", keep_both: bool = True):
+    """
+    Split a body using a construction plane.
+    Useful for multi-material props, assembly separation, or splitting large models for 3D printing.
+
+    **WHY NEEDED**: Large props often need to be split for printing bed size limitations,
+    or for creating multi-material assemblies (metallic frame + translucent crystal).
+
+    :param body_id: Body ID to split (None = last body)
+    :param split_tool: Plane to split with: "XY", "YZ", or "XZ"
+    :param keep_both: If True, keeps both halves; if False, removes one half
+    :return: Split result with body information
+
+    **Usage Example:**
+    ```python
+    # Split console at mid-height for separate base/top printing
+    result = split_body(body_id="HexColumn", split_tool="XY", keep_both=True)
+    print(f"Split into {result['result_bodies']} bodies")
+
+    # Name the resulting bodies
+    rename_body(body_id="body_0", new_name="HexColumn_Base")
+    rename_body(body_id="body_1", new_name="HexColumn_Top")
+
+    # Split for multi-material (keep top, remove bottom)
+    split_body(body_id="CrystalWindow", split_tool="XY", keep_both=False)
+    ```
+
+    **Returns:**
+    ```json
+    {
+      "success": true,
+      "original_body": "HexColumn",
+      "split_plane": "XY",
+      "keep_both": true,
+      "result_bodies": 2,
+      "message": "Body split using XY plane"
+    }
+    ```
+
+    **Best Practices:**
+    - Split AFTER all features are applied
+    - Use list_bodies() to verify result bodies
+    - Rename bodies immediately after splitting for clarity
+    - For 3D printing: split to fit printer bed (e.g., 200mm x 200mm)
+    """
+    try:
+        endpoint = config.ENDPOINTS["split_body"]
+        payload = {
+            "body_id": body_id,
+            "split_tool": split_tool,
+            "keep_both": keep_both
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("split_body failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def scale_body(body_id = None, scale_factor: float = 1.0, uniform: bool = True,
+              scale_x: float = 1.0, scale_y: float = 1.0, scale_z: float = 1.0):
+    """
+    Scale a body by specified factors.
+    Useful for adjusting prop sizes or creating scaled replicas.
+
+    **WHY NEEDED**: Props often need size adjustments (1:1 scale → desk model),
+    or non-uniform scaling for specific proportions.
+
+    :param body_id: Body ID to scale (None = last body)
+    :param scale_factor: Uniform scale factor (used if uniform=True)
+    :param uniform: If True, uses scale_factor; if False, uses scale_x/y/z
+    :param scale_x: X-axis scale factor (if uniform=False)
+    :param scale_y: Y-axis scale factor (if uniform=False)
+    :param scale_z: Z-axis scale factor (if uniform=False)
+    :return: Scale result with scaling information
+
+    **Usage Example:**
+    ```python
+    # Scale entire console to 80% for desk model
+    result = scale_body(body_id="HexColumn", scale_factor=0.8, uniform=True)
+    print(f"Scaled to {result['scale_x']}x")
+
+    # Non-uniform scaling (stretch vertically, compress horizontally)
+    scale_body(
+        body_id="Pedestal",
+        uniform=False,
+        scale_x=0.5,
+        scale_y=0.5,
+        scale_z=1.5
+    )
+
+    # Create miniature replica (25% scale)
+    scale_body(body_id="Console_Assembly", scale_factor=0.25)
+    ```
+
+    **Returns:**
+    ```json
+    {
+      "success": true,
+      "body_name": "HexColumn",
+      "uniform": true,
+      "scale_x": 0.8,
+      "scale_y": 0.8,
+      "scale_z": 0.8,
+      "message": "Body scaled by 0.8"
+    }
+    ```
+
+    **Best Practices:**
+    - Scale AFTER all features are complete
+    - Use uniform scaling to maintain proportions
+    - For 3D printing: scale to fit printer bed
+    - For miniatures: 0.1-0.5x scale factors common
+    - For display models: 0.6-0.8x often ideal
+    """
+    try:
+        endpoint = config.ENDPOINTS["scale_body"]
+        payload = {
+            "body_id": body_id,
+            "scale_factor": scale_factor,
+            "uniform": uniform,
+            "scale_x": scale_x,
+            "scale_y": scale_y,
+            "scale_z": scale_z
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("scale_body failed: %s", e)
+        raise
+
+
+#########################################################################################
 ### END OF NEW ENHANCED TOOLS ###
 #########################################################################################
 

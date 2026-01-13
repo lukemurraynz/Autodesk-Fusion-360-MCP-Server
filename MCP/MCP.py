@@ -272,6 +272,27 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
                                 task[5] if len(task) > 5 else True,
                                 task[6] if len(task) > 6 else True)
             query_results['extrude_safe'] = result
+        elif task[0] == 'chamfer_edges':
+            distance = task[1]
+            edge_ids = task[2] if len(task) > 2 else None
+            angle = task[3] if len(task) > 3 else 45.0
+            result = chamfer_edges(design, ui, distance, edge_ids, angle)
+            query_results['chamfer_edges'] = result
+        elif task[0] == 'split_body':
+            body_id = task[1] if len(task) > 1 else None
+            split_tool = task[2] if len(task) > 2 else "XY"
+            keep_both = task[3] if len(task) > 3 else True
+            result = split_body(design, ui, body_id, split_tool, keep_both)
+            query_results['split_body'] = result
+        elif task[0] == 'scale_body':
+            body_id = task[1] if len(task) > 1 else None
+            scale_factor = task[2] if len(task) > 2 else 1.0
+            uniform = task[3] if len(task) > 3 else True
+            scale_x = task[4] if len(task) > 4 else 1.0
+            scale_y = task[5] if len(task) > 5 else 1.0
+            scale_z = task[6] if len(task) > 6 else 1.0
+            result = scale_body(design, ui, body_id, scale_factor, uniform, scale_x, scale_y, scale_z)
+            query_results['scale_body'] = result
 
 
 
@@ -1589,6 +1610,246 @@ def fillet_edges(design, ui, radius=0.3, edge_ids=None):
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
         return {"success": False, "error": str(e)}
+
+def chamfer_edges(design, ui, distance=0.5, edge_ids=None, angle=45.0):
+    """
+    Creates angled beveled edges (chamfers) on specified edges.
+    Unlike fillets (rounded), chamfers create flat angled surfaces.
+
+    :param distance: Chamfer distance in cm (how far from edge the bevel extends)
+    :param edge_ids: List of edge indices or None for all edges
+    :param angle: Chamfer angle in degrees (default 45°)
+    :return: Result with success status and chamfer details
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+        chamfers = rootComp.features.chamferFeatures
+
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies found"}
+
+        successful_chamfers = 0
+        failed_edges = 0
+
+        # If specific edge IDs provided, only chamfer those
+        if edge_ids is not None and len(edge_ids) > 0:
+            # Get the last body
+            body = bodies.item(bodies.count - 1)
+
+            # Create edge collection for specified edges
+            edgeCollection = adsk.core.ObjectCollection.create()
+
+            for edge_id in edge_ids:
+                if isinstance(edge_id, int) and 0 <= edge_id < body.edges.count:
+                    edge = body.edges.item(edge_id)
+                    edgeCollection.add(edge)
+
+            if edgeCollection.count == 0:
+                return {"success": False, "error": "No valid edges found in edge_ids"}
+
+            try:
+                # Create chamfer for selected edges
+                distanceInput = adsk.core.ValueInput.createByReal(distance)
+                chamferInput = chamfers.createInput2()
+                chamferInput.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                    edgeCollection, distanceInput, True
+                )
+                chamfers.add(chamferInput)
+                successful_chamfers = edgeCollection.count
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to chamfer specified edges: {str(e)}"
+                }
+        else:
+            # Try to chamfer all edges
+            for body_idx in range(bodies.count):
+                body = bodies.item(body_idx)
+
+                for edge_idx in range(body.edges.count):
+                    edge = body.edges.item(edge_idx)
+
+                    try:
+                        edgeCollection = adsk.core.ObjectCollection.create()
+                        edgeCollection.add(edge)
+                        distanceInput = adsk.core.ValueInput.createByReal(distance)
+                        chamferInput = chamfers.createInput2()
+                        chamferInput.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                            edgeCollection, distanceInput, True
+                        )
+                        chamfers.add(chamferInput)
+                        successful_chamfers += 1
+                    except Exception:
+                        failed_edges += 1
+                        continue
+
+        return {
+            "success": True,
+            "successful_chamfers": successful_chamfers,
+            "failed_edges": failed_edges,
+            "distance": distance,
+            "angle": angle,
+            "message": f"Successfully chamfered {successful_chamfers} edge(s)" +
+                      (f", {failed_edges} edge(s) skipped" if failed_edges > 0 else "")
+        }
+
+    except Exception as e:
+        if ui:
+            ui.messageBox('Chamfer failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+def split_body(design, ui, body_id=None, split_tool="sketch_plane", keep_both=True):
+    """
+    Splits a body using a sketch plane or construction plane.
+    Useful for multi-material props or splitting for 3D printing.
+
+    :param body_id: Body ID to split (None = last body)
+    :param split_tool: "sketch_plane", "XY", "YZ", "XZ", or "construction_plane"
+    :param keep_both: If True, keeps both halves; if False, keeps only one
+    :return: Result with split body information
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies found"}
+
+        # Get target body
+        if body_id is not None and isinstance(body_id, str):
+            target_body = None
+            for i in range(bodies.count):
+                body = bodies.item(i)
+                if body.name == body_id or f"body_{i}" == body_id:
+                    target_body = body
+                    break
+            if target_body is None:
+                return {"success": False, "error": f"Body {body_id} not found"}
+        else:
+            target_body = bodies.item(bodies.count - 1)
+
+        # Get splitting plane
+        splitFace = None
+        if split_tool in ["XY", "YZ", "XZ"]:
+            # Use construction plane
+            planes = rootComp.constructionPlanes
+            if split_tool == "XY":
+                plane = rootComp.xYConstructionPlane
+            elif split_tool == "YZ":
+                plane = rootComp.yZConstructionPlane
+            else:  # XZ
+                plane = rootComp.xZConstructionPlane
+
+            # Create split using plane
+            splitBodyFeats = rootComp.features.splitBodyFeatures
+            splitBodyInput = splitBodyFeats.createInput(target_body, plane, not keep_both)
+            splitBodyFeats.add(splitBodyInput)
+
+            return {
+                "success": True,
+                "original_body": target_body.name,
+                "split_plane": split_tool,
+                "keep_both": keep_both,
+                "result_bodies": bodies.count,
+                "message": f"Body split using {split_tool} plane"
+            }
+        else:
+            return {
+                "success": False,
+                "error": "split_tool must be 'XY', 'YZ', or 'XZ'"
+            }
+
+    except Exception as e:
+        if ui:
+            ui.messageBox('Split body failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+def scale_body(design, ui, body_id=None, scale_factor=1.0, uniform=True,
+              scale_x=1.0, scale_y=1.0, scale_z=1.0):
+    """
+    Scales a body by specified factors.
+    Useful for adjusting prop sizes or creating scaled replicas.
+
+    :param body_id: Body ID to scale (None = last body)
+    :param scale_factor: Uniform scale factor (used if uniform=True)
+    :param uniform: If True, uses scale_factor; if False, uses scale_x/y/z
+    :param scale_x: X-axis scale factor
+    :param scale_y: Y-axis scale factor
+    :param scale_z: Z-axis scale factor
+    :return: Result with scaling information
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+
+        if bodies.count == 0:
+            return {"success": False, "error": "No bodies found"}
+
+        # Get target body
+        if body_id is not None and isinstance(body_id, str):
+            target_body = None
+            for i in range(bodies.count):
+                body = bodies.item(i)
+                if body.name == body_id or f"body_{i}" == body_id:
+                    target_body = body
+                    break
+            if target_body is None:
+                return {"success": False, "error": f"Body {body_id} not found"}
+        else:
+            target_body = bodies.item(bodies.count - 1)
+
+        # Determine scale factors
+        if uniform:
+            final_scale_x = scale_factor
+            final_scale_y = scale_factor
+            final_scale_z = scale_factor
+        else:
+            final_scale_x = scale_x
+            final_scale_y = scale_y
+            final_scale_z = scale_z
+
+        # Create scale feature
+        scaleFeatures = rootComp.features.scaleFeatures
+
+        # Create an object collection with the body
+        inputEntities = adsk.core.ObjectCollection.create()
+        inputEntities.add(target_body)
+
+        # Get the origin point as the scale center
+        originPoint = rootComp.originConstructionPoint
+
+        # Create scale input
+        scaleInput = scaleFeatures.createInput(inputEntities, originPoint)
+
+        # Set scale factors
+        if uniform:
+            scaleInput.setToUniform(adsk.core.ValueInput.createByReal(scale_factor))
+        else:
+            scaleInput.setToNonUniform(
+                adsk.core.ValueInput.createByReal(final_scale_x),
+                adsk.core.ValueInput.createByReal(final_scale_y),
+                adsk.core.ValueInput.createByReal(final_scale_z)
+            )
+
+        # Add the scale feature
+        scaleFeatures.add(scaleInput)
+
+        return {
+            "success": True,
+            "body_name": target_body.name,
+            "uniform": uniform,
+            "scale_x": final_scale_x,
+            "scale_y": final_scale_y,
+            "scale_z": final_scale_z,
+            "message": f"Body scaled by {scale_factor if uniform else f'x={final_scale_x}, y={final_scale_y}, z={final_scale_z}'}"
+        }
+
+    except Exception as e:
+        if ui:
+            ui.messageBox('Scale body failed:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
 def revolve_profile(design, ui,  angle=360):
     """
     This function revolves already existing sketch with drawn lines from the function draw_lines
@@ -3780,6 +4041,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode('utf-8'))
+            # PROP PERFECTION TOOLS GET ENDPOINTS
+            elif self.path == '/chamfer_edges':
+                result = query_results.get('chamfer_edges', {"success": False, "error": "No data available. Call POST /chamfer_edges first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/split_body':
+                result = query_results.get('split_body', {"success": False, "error": "No data available. Call POST /split_body first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/scale_body':
+                result = query_results.get('scale_body', {"success": False, "error": "No data available. Call POST /scale_body first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
             else:
                 self.send_error(404,'Not Found')
         except Exception as e:
@@ -3863,6 +4143,41 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"message": "Fillet edges started"}).encode('utf-8'))
+
+            elif path == '/chamfer_edges':
+                distance = float(data.get('distance', 0.5))
+                edge_ids = data.get('edges', None)
+                angle = float(data.get('angle', 45.0))
+                if edge_ids is not None and not isinstance(edge_ids, list):
+                    edge_ids = None
+                task_queue.put(('chamfer_edges', distance, edge_ids, angle))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Chamfer edges started"}).encode('utf-8'))
+
+            elif path == '/split_body':
+                body_id = data.get('body_id', None)
+                split_tool = data.get('split_tool', 'XY')
+                keep_both = bool(data.get('keep_both', True))
+                task_queue.put(('split_body', body_id, split_tool, keep_both))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Split body started"}).encode('utf-8'))
+
+            elif path == '/scale_body':
+                body_id = data.get('body_id', None)
+                scale_factor = float(data.get('scale_factor', 1.0))
+                uniform = bool(data.get('uniform', True))
+                scale_x = float(data.get('scale_x', 1.0))
+                scale_y = float(data.get('scale_y', 1.0))
+                scale_z = float(data.get('scale_z', 1.0))
+                task_queue.put(('scale_body', body_id, scale_factor, uniform, scale_x, scale_y, scale_z))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Scale body started"}).encode('utf-8'))
 
             elif path == '/draw_cylinder':
                 radius = float(data.get('radius'))
