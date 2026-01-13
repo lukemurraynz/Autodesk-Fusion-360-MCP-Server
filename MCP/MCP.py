@@ -515,6 +515,11 @@ def pocket_recess(design, ui, depth, face_index=None):
         sketches = rootComp.sketches
         bodies = rootComp.bRepBodies
         
+        # Check if there are any bodies to cut into
+        if bodies.count == 0:
+            ui.messageBox("No target body found to cut or intersect! Please create a body first before using pocket_recess.")
+            return
+        
         # Get the last sketch
         if sketches.count == 0:
             ui.messageBox("No sketch found. Please create a sketch first.")
@@ -956,6 +961,11 @@ def spline(design, ui, points, plane="XY"):
             splinePoints.add(adsk.core.Point3D.create(point[0], point[1], point[2]))
         
         sketch.sketchCurves.sketchFittedSplines.add(splinePoints)
+        
+        # Check if the sketch has closed profiles (informational warning)
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
     except:
         if ui:
             ui.messageBox('Failed draw_spline:\n{}'.format(traceback.format_exc()))
@@ -993,6 +1003,11 @@ def arc(design,ui,point1,point2,points3,plane = "XY",connect = False):
             connect = False
         else:
             lines = sketch.sketchCurves.sketchLines
+        
+        # Check if the sketch has closed profiles (informational warning)
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
 
     except:
         if ui:
@@ -1054,6 +1069,11 @@ def draw_one_line(design, ui, x1, y1, z1, x2, y2, z2, plane="XY"):
         start = adsk.core.Point3D.create(x1, y1, 0)
         end = adsk.core.Point3D.create(x2, y2, 0)
         sketch.sketchCurves.sketchLines.addByTwoPoints(start, end)
+        
+        # Check if the sketch has closed profiles after adding the line (informational warning)
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox('Sketch has no closed profiles. Please draw a closed shape.')
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
@@ -1269,24 +1289,48 @@ def shell_existing_body(design, ui, thickness=0.5, faceindex=0):
 def fillet_edges(design, ui, radius=0.3):
     try:
         rootComp = design.rootComponent
-
         bodies = rootComp.bRepBodies
-
-        edgeCollection = adsk.core.ObjectCollection.create()
+        fillets = rootComp.features.filletFeatures
+        
+        successful_fillets = 0
+        failed_edges = 0
+        
+        # Process each body separately to avoid failing on problematic edges
         for body_idx in range(bodies.count):
             body = bodies.item(body_idx)
+            
+            # Try to fillet edges in smaller groups to handle failures better
             for edge_idx in range(body.edges.count):
                 edge = body.edges.item(edge_idx)
-                edgeCollection.add(edge)
-
-        fillets = rootComp.features.filletFeatures
-        radiusInput = adsk.core.ValueInput.createByReal(radius)
-        filletInput = fillets.createInput()
-        filletInput.isRollingBallCorner = True
-        edgeSetInput = filletInput.edgeSetInputs.addConstantRadiusEdgeSet(edgeCollection, radiusInput, True)
-        edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
-        fillets.add(filletInput)
-
+                
+                try:
+                    # Create a collection for this single edge
+                    edgeCollection = adsk.core.ObjectCollection.create()
+                    edgeCollection.add(edge)
+                    
+                    # Try to create the fillet for this edge
+                    radiusInput = adsk.core.ValueInput.createByReal(radius)
+                    filletInput = fillets.createInput()
+                    filletInput.isRollingBallCorner = True
+                    edgeSetInput = filletInput.edgeSetInputs.addConstantRadiusEdgeSet(edgeCollection, radiusInput, True)
+                    edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
+                    fillets.add(filletInput)
+                    successful_fillets += 1
+                except:
+                    # Skip edges that can't be filleted (e.g., sharp corners)
+                    failed_edges += 1
+                    continue
+        
+        # Inform user of results
+        if ui:
+            if successful_fillets > 0:
+                message = f'Successfully filleted {successful_fillets} edge(s).'
+                if failed_edges > 0:
+                    message += f'\n{failed_edges} edge(s) could not be filleted (possibly sharp corners or geometric constraints).'
+                ui.messageBox(message)
+            else:
+                ui.messageBox('No edges could be filleted. Try adjusting the radius or check geometry.')
+    
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
@@ -1483,6 +1527,13 @@ def cut_extrude(design,ui,depth):
     try:
         rootComp = design.rootComponent 
         sketches = rootComp.sketches
+        bodies = rootComp.bRepBodies
+        
+        # Check if there are any bodies to cut into
+        if bodies.count == 0:
+            if ui:
+                ui.messageBox("No target body found to cut or intersect! Please create a body first before using cut_extrude.")
+            return
         
         # Check if there are any sketches
         if sketches.count == 0:
