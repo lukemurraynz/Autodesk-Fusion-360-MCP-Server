@@ -136,7 +136,10 @@ def send_request(endpoint, data, headers):
                 return response.json()
             except json.JSONDecodeError as e:
                 logging.error("Failed to decode JSON response: %s", e)
-                raise
+                # If max retries reached, raise the exception
+                if attempt == max_retries - 1:
+                    raise
+                # Otherwise continue to retry with delay
 
         except requests.RequestException as e:
             logging.error("Request failed on attempt %d: %s", attempt + 1, e)
@@ -144,13 +147,14 @@ def send_request(endpoint, data, headers):
             # If max retries reached, raise the exception
             if attempt == max_retries - 1:
                 raise
-            
-            # Add delay before retry to give Fusion time to process
-            time.sleep(2)
 
         except Exception as e:
             logging.error("Unexpected error: %s", e)
             raise
+        
+        # Add delay before retry to give Fusion time to process
+        # This applies to both RequestException and JSONDecodeError
+        time.sleep(2)
 
 @mcp.tool()
 def move_latest_body(x : float,y:float,z:float):
