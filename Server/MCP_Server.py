@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import requests
+import time
 from mcp.server.fastmcp import FastMCP
 import config
 
@@ -128,14 +129,18 @@ def send_request(endpoint, data, headers):
     for attempt in range(max_retries):
         try:
             data = json.dumps(data)
-            response = requests.post(endpoint, data, headers, timeout=10)
+            response = requests.post(endpoint, data, headers, timeout=config.REQUEST_TIMEOUT)
 
             # Check if the response is valid JSON
             try:
                 return response.json()
             except json.JSONDecodeError as e:
                 logging.error("Failed to decode JSON response: %s", e)
-                raise
+                # If max retries reached, raise the exception
+                if attempt == max_retries - 1:
+                    raise
+                # Add delay before retry to give Fusion time to process
+                time.sleep(config.RETRY_DELAY)
 
         except requests.RequestException as e:
             logging.error("Request failed on attempt %d: %s", attempt + 1, e)
@@ -143,6 +148,9 @@ def send_request(endpoint, data, headers):
             # If max retries reached, raise the exception
             if attempt == max_retries - 1:
                 raise
+            
+            # Add delay before retry to give Fusion time to process
+            time.sleep(config.RETRY_DELAY)
 
         except Exception as e:
             logging.error("Unexpected error: %s", e)

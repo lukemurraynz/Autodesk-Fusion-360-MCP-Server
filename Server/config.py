@@ -57,3 +57,4 @@ HEADERS = {
 
 # Timeouts (in Sekunden)
 REQUEST_TIMEOUT = 30
+RETRY_DELAY = 2  # Seconds to wait between retry attempts
