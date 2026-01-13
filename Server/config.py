@@ -40,6 +40,13 @@ ENDPOINTS = {
     "rectangular_pattern": f"{BASE_URL}/rectangular_pattern",
     "draw_text": f"{BASE_URL}/draw_text",
     "move_body": f"{BASE_URL}/move_body",
+    "pocket_recess": f"{BASE_URL}/pocket_recess",
+    "sketch_on_face": f"{BASE_URL}/sketch_on_face",
+    "create_work_plane": f"{BASE_URL}/create_work_plane",
+    "project_edges": f"{BASE_URL}/project_edges",
+    "draw_polygon": f"{BASE_URL}/draw_polygon",
+    "offset_surface": f"{BASE_URL}/offset_surface",
+    "mirror_feature": f"{BASE_URL}/mirror_feature",
     
 }
 

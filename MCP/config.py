@@ -37,7 +37,16 @@ ENDPOINTS = {
     "delete_everything": f"{BASE_URL}/delete_everything",
     "boolean_operation": f"{BASE_URL}/boolean_operation",
     "draw_2d_rectangle": f"{BASE_URL}/draw_2d_rectangle",
-    "rectangular_pattern": f"{BASE_URL}/rectangular_pattern"
+    "rectangular_pattern": f"{BASE_URL}/rectangular_pattern",
+    "draw_text": f"{BASE_URL}/draw_text",
+    "move_body": f"{BASE_URL}/move_body",
+    "pocket_recess": f"{BASE_URL}/pocket_recess",
+    "sketch_on_face": f"{BASE_URL}/sketch_on_face",
+    "create_work_plane": f"{BASE_URL}/create_work_plane",
+    "project_edges": f"{BASE_URL}/project_edges",
+    "draw_polygon": f"{BASE_URL}/draw_polygon",
+    "offset_surface": f"{BASE_URL}/offset_surface",
+    "mirror_feature": f"{BASE_URL}/mirror_feature",
     
 }
 
