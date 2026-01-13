@@ -13,6 +13,29 @@ These enhancements were designed specifically to support the manufacturing of sc
 - **Edge-selective filleting** for precise control
 - **Comprehensive body/sketch management** for complex models
 
+## Important: Asynchronous Architecture
+
+**Note:** Due to Fusion 360's thread-safety requirements, the MCP server uses an asynchronous task queue architecture. Query operations (list_bodies, get_active_body, etc.) work in two steps:
+
+1. **POST request** - Triggers the query and queues it for processing
+2. **GET request** - Retrieves the cached results (typically available within 1 second)
+
+Example workflow:
+```python
+# Step 1: Trigger the query
+POST /list_bodies
+# Returns: {"message": "Body list requested", "note": "Results available via GET /list_bodies"}
+
+# Step 2: Wait briefly for processing (typically < 1 second)
+time.sleep(1)
+
+# Step 3: Retrieve the results
+GET /list_bodies
+# Returns: {"success": true, "count": 4, "bodies": [...]}
+```
+
+This pattern applies to: `list_bodies`, `get_active_body`, `list_sketches`, `get_active_sketch`
+
 ## New Features
 
 ### 1. Enhanced `extrude()` - Body ID Tracking
@@ -69,7 +92,14 @@ Lists all bodies in the design with detailed information.
 
 **Usage:**
 ```python
-bodies = list_bodies()
+# Step 1: Request the body list
+POST /list_bodies
+
+# Step 2: Wait briefly for processing
+time.sleep(1)
+
+# Step 3: Retrieve the results
+bodies = GET /list_bodies
 print(f"Found {bodies['count']} bodies")
 for body in bodies['bodies']:
     print(f"- {body['name']} (index: {body['index']})")

@@ -13,6 +13,21 @@ ModelParameterSnapshot = []
 httpd = None
 task_queue = queue.Queue()  # Queue für thread-safe Aktionen
 
+# Global results cache for query operations
+query_results = {
+    'list_bodies': None,
+    'get_active_body': None,
+    'rename_body': None,
+    'list_sketches': None,
+    'get_active_sketch': None,
+    'activate_sketch': None,
+    'close_sketch': None,
+    'extrude': None,
+    'pocket_recess': None,
+    'circular_pattern': None,
+    'fillet_edges': None
+}
+
 # Event Handler Variablen
 app = None
 ui = None
@@ -55,8 +70,11 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
             pass
     
     def process_task(self, task):
-        """Verarbeitet eine einzelne Task"""
-        global design, ui
+        """Verarbeitet eine einzelne Task und speichert Rückgabewerte für Abfragen"""
+        global design, ui, query_results
+        
+        # Capture return values for query operations
+        result = None
         
         if task[0] == 'set_parameter':
             set_parameter(design, ui, task[1], task[2])
@@ -70,7 +88,8 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
 
             export_as_STL(design, ui, task[1])
         elif task[0] == 'fillet_edges':
-            fillet_edges(design, ui, task[1], task[2] if len(task) > 2 else None)
+            result = fillet_edges(design, ui, task[1], task[2] if len(task) > 2 else None)
+            query_results['fillet_edges'] = result
         elif task[0] == 'export_step':
 
             export_as_STEP(design, ui, task[1])
@@ -83,7 +102,8 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'draw_lines':
             draw_lines(design, ui, task[1], task[2])
         elif task[0] == 'extrude_last_sketch':
-            extrude_last_sketch(design, ui, task[1],task[2])
+            result = extrude_last_sketch(design, ui, task[1],task[2])
+            query_results['extrude'] = result
         elif task[0] == 'revolve_profile':
             # 'rootComp = design.rootComponent
             # sketches = rootComp.sketches
@@ -112,7 +132,8 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'cut_extrude':
             cut_extrude(design,ui,task[1])
         elif task[0] == 'circular_pattern':
-            circular_pattern(design,ui,task[1],task[2],task[3])
+            result = circular_pattern(design,ui,task[1],task[2],task[3])
+            query_results['circular_pattern'] = result
         elif task[0] == 'offsetplane':
             offsetplane(design,ui,task[1],task[2])
         elif task[0] == 'loft':
@@ -136,8 +157,9 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'move_body':
             move_last_body(design,ui,task[1],task[2],task[3])
         elif task[0] == 'pocket_recess':
-            pocket_recess(design, ui, task[1], task[2] if len(task) > 2 else None, 
+            result = pocket_recess(design, ui, task[1], task[2] if len(task) > 2 else None, 
                          task[3] if len(task) > 3 else None, task[4] if len(task) > 4 else None)
+            query_results['pocket_recess'] = result
         elif task[0] == 'sketch_on_face':
             sketch_on_face(design, ui, task[1], task[2])
         elif task[0] == 'create_work_plane':
@@ -151,20 +173,27 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'mirror_feature':
             mirror_feature(design, ui, task[1], task[2])
         elif task[0] == 'list_bodies':
-            return list_bodies(design, ui)
+            result = list_bodies(design, ui)
+            query_results['list_bodies'] = result
         elif task[0] == 'get_active_body':
-            return get_active_body(design, ui)
+            result = get_active_body(design, ui)
+            query_results['get_active_body'] = result
         elif task[0] == 'rename_body':
-            return rename_body(design, ui, task[1], task[2])
+            result = rename_body(design, ui, task[1], task[2])
+            query_results['rename_body'] = result
         elif task[0] == 'list_sketches':
-            return list_sketches(design, ui)
+            result = list_sketches(design, ui)
+            query_results['list_sketches'] = result
         elif task[0] == 'get_active_sketch':
-            return get_active_sketch(design, ui)
+            result = get_active_sketch(design, ui)
+            query_results['get_active_sketch'] = result
         elif task[0] == 'activate_sketch':
-            return activate_sketch(design, ui, task[1])
+            result = activate_sketch(design, ui, task[1])
+            query_results['activate_sketch'] = result
         elif task[0] == 'close_sketch':
             sketch_id = task[1] if len(task) > 1 else None
-            return close_sketch(design, ui, sketch_id)
+            result = close_sketch(design, ui, sketch_id)
+            query_results['close_sketch'] = result
         
 
 
@@ -599,7 +628,7 @@ def pocket_recess(design, ui, depth, face_index=None, body_id=None, sketch_id=No
             extrudeInput.participantBodies = participantBodies
         
         try:
-            ext = extrudes.add(extrudeInput)
+            extrudes.add(extrudeInput)
             return {
                 "success": True,
                 "depth": depth,
@@ -1460,7 +1489,7 @@ def fillet_edges(design, ui, radius=0.3, edge_ids=None):
                         edgeSetInput.continuity = adsk.fusion.SurfaceContinuityTypes.TangentSurfaceContinuityType
                         fillets.add(filletInput)
                         successful_fillets += 1
-                    except:
+                    except Exception:
                         # Skip edges that can't be filleted (e.g., sharp corners)
                         failed_edges += 1
                         continue
@@ -2222,7 +2251,7 @@ def close_sketch(design, ui, sketch_id=None):
 # HTTP Server######
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        global ModelParameterSnapshot
+        global ModelParameterSnapshot, query_results
         try:
             if self.path == '/count_parameters':
                 self.send_response(200)
@@ -2234,7 +2263,31 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps({"ModelParameter": ModelParameterSnapshot}).encode('utf-8'))
-           
+            elif self.path == '/list_bodies':
+                # Return cached result from last list_bodies operation
+                result = query_results.get('list_bodies', {"success": False, "error": "No data available. Call POST /list_bodies first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/get_active_body':
+                result = query_results.get('get_active_body', {"success": False, "error": "No data available. Call POST /get_active_body first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/list_sketches':
+                result = query_results.get('list_sketches', {"success": False, "error": "No data available. Call POST /list_sketches first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/get_active_sketch':
+                result = query_results.get('get_active_sketch', {"success": False, "error": "No data available. Call POST /get_active_sketch first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
             else:
                 self.send_error(404,'Not Found')
         except Exception as e:
@@ -2697,14 +2750,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Listing bodies"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Body list requested", 
+                    "note": "Results will be available via GET /list_bodies after processing (typically < 1 second)"
+                }).encode('utf-8'))
             
             elif path == '/get_active_body':
                 task_queue.put(('get_active_body',))
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Getting active body"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Active body requested", 
+                    "note": "Results will be available via GET /get_active_body after processing (typically < 1 second)"
+                }).encode('utf-8'))
             
             elif path == '/rename_body':
                 body_id = data.get('body_id', None)
@@ -2723,14 +2782,20 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Listing sketches"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Sketch list requested", 
+                    "note": "Results will be available via GET /list_sketches after processing (typically < 1 second)"
+                }).encode('utf-8'))
             
             elif path == '/get_active_sketch':
                 task_queue.put(('get_active_sketch',))
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Getting active sketch"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Active sketch requested", 
+                    "note": "Results will be available via GET /get_active_sketch after processing (typically < 1 second)"
+                }).encode('utf-8'))
             
             elif path == '/activate_sketch':
                 sketch_id = data.get('sketch_id', None)

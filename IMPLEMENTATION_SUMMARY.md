@@ -4,6 +4,24 @@
 
 This implementation adds comprehensive prop modeling capabilities to the Fusion 360 MCP Server, specifically designed to support the manufacturing of physical replicas like the Stargate Atlantis Override Console.
 
+## Architectural Note: Asynchronous Query Pattern
+
+**Important:** Due to Fusion 360's thread-safety requirements, the MCP server uses an asynchronous task queue architecture. This creates a challenge for query operations that need to return data:
+
+**The Challenge:**
+- HTTP requests are handled in a separate thread
+- Fusion 360 API calls must execute on the main thread via custom events
+- HTTP responses must be sent immediately (can't wait for Fusion operation to complete)
+
+**The Solution:**
+A two-step request pattern for query operations:
+1. **POST /endpoint** - Queues the operation, returns acknowledgment
+2. **GET /endpoint** - Returns cached results from last operation
+
+This pattern applies to: `list_bodies`, `get_active_body`, `list_sketches`, `get_active_sketch`
+
+For action operations (extrude, pocket_recess, etc.), results are cached internally and available for debugging/verification.
+
 ## Problem Statement
 
 The original issue identified several critical limitations:
@@ -28,15 +46,22 @@ These limitations made it impossible to create complex, segmented props with:
 **Changes:**
 - Modified `extrude_last_sketch()` in MCP.py to return JSON with body_id
 - Body IDs use Fusion's entity token system
-- Updated HTTP handler to return full response
+- Results are cached in global `query_results` dictionary
+- Due to async architecture, results must be retrieved via follow-up GET request
 
 **Impact:**
 ```python
-# Before
-extrude(5.0)  # Returns nothing
+# Via MCP Server (Python code calling the HTTP API):
+# Step 1: Trigger extrusion
+POST /extrude_last_sketch with {"value": 5.0, "taperangle": 0.0}
+# Returns acknowledgment
 
-# After
-result = extrude(5.0, angle=0.0)
+# Step 2: Wait briefly
+time.sleep(1)
+
+# Step 3: Query results are cached internally for other operations
+# Direct function call (within Fusion add-in):
+result = extrude_last_sketch(5.0, angle=0.0)
 # Returns: {"success": True, "body_id": "...", "body_name": "Body1"}
 ```
 

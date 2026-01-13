@@ -987,7 +987,7 @@ def loft(sketchcount: int):
 
 
 @mcp.tool()
-def pocket_recess(depth: float, face_index: int = None, body_id: str = None, sketch_id: str = None):
+def pocket_recess(depth: float, face_index: int = None, body_id = None, sketch_id = None):
     """
     Creates a pocket/recess in an existing body by cutting a sketch.
     Now supports explicit body_id and sketch_id for precise targeting.
@@ -1216,11 +1216,11 @@ def get_active_body():
 
 
 @mcp.tool()
-def rename_body(body_id: str, new_name: str):
+def rename_body(body_id, new_name: str):
     """
     Renames a body for better organization in complex models.
     
-    :param body_id: Body ID, index, or current name
+    :param body_id: Body ID (string), index (int), or current name
     :param new_name: New name for the body (e.g., "HexColumn", "ZigzagFrame", "TopLid")
     
     Essential for tracking components like:
@@ -1281,7 +1281,7 @@ def get_active_sketch():
 
 
 @mcp.tool()
-def activate_sketch(sketch_id: str):
+def activate_sketch(sketch_id):
     """
     Activates a sketch for editing by its ID or index.
     Validates the sketch exists and makes it visible if needed.
@@ -1301,7 +1301,7 @@ def activate_sketch(sketch_id: str):
 
 
 @mcp.tool()
-def close_sketch(sketch_id: str = None):
+def close_sketch(sketch_id = None):
     """
     Closes/deactivates a sketch.
     If sketch_id is None, closes the currently active sketch.
