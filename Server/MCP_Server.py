@@ -79,14 +79,39 @@ mcp = FastMCP("Fusion",
                 **DrawBox and DrawCylinder:**
                 - The specified coordinates are always the center point of the body.
 
-                **Prop Replica and PC Case Workflow:**
-                - For prop replicas, start with overall dimensions and main structure.
-                - Use shell_body to hollow out cases with appropriate wall thickness (0.3-0.5cm).
-                - Use sketch_on_face and pocket_recess for panel details.
-                - Use draw_holes for mounting points (motherboard, PSU, drives).
-                - Use rectangular_pattern or circular_pattern for ventilation arrays.
-                - Use fillet_edges to smooth sharp edges.
-                - Export with export_step (for CAD) and export_stl (for 3D printing).
+                **Advanced Features - Use When Appropriate:**
+                - **sketch_on_face**: Create sketches directly on faces of existing bodies for precise placement
+                - **pocket_recess**: Create depressions/recesses in bodies (depth in cm, positive values)
+                - **draw_polygon**: Create regular polygons (hexagons, octagons, etc.) with specified sides
+                - **mirror_feature**: Mirror bodies across XY, XZ, or YZ planes for symmetry
+                - **create_work_plane**: Create offset construction planes for complex geometries
+                - **project_edges**: Project body edges onto sketch planes for alignment
+                - **offset_surface**: Create offset surfaces for wall thickness or parallel faces
+                
+                **Pattern Best Practices:**
+                - Use rectangular_pattern for grid-like arrangements (specify plane, quantities, distances, axes)
+                - Use circular_pattern for radial arrangements (specify plane, quantity, axis)
+                - Distance values in patterns are in cm (remember 1 unit = 1 cm)
+                - Ensure original feature is properly positioned before patterning
+
+                **Complex Model Workflow:**
+                1. Start with main body structure (draw_box, draw_cylinder, or combination)
+                2. Add or remove material (extrude, cut_extrude, boolean operations)
+                3. Add details (sketches on faces, pockets, holes, fillets)
+                4. Create patterns if needed (rectangular_pattern, circular_pattern, mirror_feature)
+                5. Finish with edge treatments (fillet_edges for smooth edges)
+                6. Export when complete (export_step for CAD, export_stl for 3D printing)
+
+                **Prop Replicas and Functional Enclosures:**
+                - Start with overall dimensions and main structure
+                - Use shell_body to hollow out with wall thickness 0.3-0.5cm (3-5mm)
+                - Use sketch_on_face + pocket_recess for panel insets and details
+                - Use draw_holes for mounting points with appropriate diameter (typically 0.3-0.4cm for M3 screws)
+                - Create ventilation with draw_polygon + rectangular_pattern (hex patterns popular)
+                - Add functional features: I/O cutouts, cable channels, alignment pins
+                - Use fillet_edges to smooth sharp edges (typical 0.2-0.5cm radius)
+                - Consider assembly: design for 3D printing bed size, add alignment features
+                - Export both STEP (for further editing) and STL (for fabrication)
                 """
 
                 )
@@ -1260,256 +1285,6 @@ def kompensator():
     
                 """
     return prompt
-
-
-@mcp.prompt()
-def prop_replica_pc_case():
-    """
-    Comprehensive workflow for creating prop replicas that will become custom PC cases.
-    This prompt demonstrates using all available tools for complex modeling tasks.
-    """
-    return """
-    # Prop Replica PC Case Creation Workflow
-    
-    You are creating a detailed 3D model of a prop replica that will become a custom PC case.
-    This requires precise modeling with attention to:
-    - Accurate dimensions and proportions based on reference images
-    - Ventilation and cooling considerations
-    - Component mounting points (motherboard, PSU, drives, etc.)
-    - Cable management
-    - Structural integrity
-    - Aesthetic details matching the prop
-    
-    ## GENERAL WORKFLOW FOR PROP REPLICA:
-    
-    ### Phase 1: Main Structure
-    1. **Clear workspace**: Use delete_all() to start fresh
-    2. **Create base form**: Use draw_box() or draw_cylinder() for main body
-    3. **Hollow out interior**: Use shell_body() with appropriate wall thickness (typically 0.3-0.5cm)
-    4. **Add panels**: Use draw_box() for side panels, top, bottom at correct positions
-    
-    ### Phase 2: Ventilation & Cooling
-    1. **Ventilation pattern**: Use draw_polygon(sides=6) for hexagonal vents
-    2. **Create vent pattern**: Use sketch_on_face() to sketch on panels
-    3. **Cut vents**: Use pocket_recess() or cut_extrude() for vent holes
-    4. **Pattern vents**: Use rectangular_pattern() or circular_pattern() for vent arrays
-    
-    ### Phase 3: Mounting Points
-    1. **Motherboard standoffs**: Use draw_holes() with appropriate positions
-       - ATX: 9-12 mounting holes in standard pattern
-       - MicroATX: 6-7 holes
-       - ITX: 4 holes
-    2. **PSU mounting**: 4 holes in standard PSU pattern
-    3. **Drive bays**: Use draw_holes() for HDD/SSD mounting
-    4. **Add threads**: Use create_thread() for screw holes where needed
-    
-    ### Phase 4: Details & Features
-    1. **Decorative elements**: Use loft(), sweep(), or revolve() for complex shapes
-    2. **Panel recesses**: Use pocket_recess() for inset panels
-    3. **Edge finishing**: Use fillet_edges() to round sharp corners
-    4. **Access ports**: Use draw2Dcircle() + cut_extrude() for I/O cutouts
-    
-    ### Phase 5: Symmetry & Refinement
-    1. **Mirror features**: Use mirror_feature() for symmetric elements
-    2. **Work planes**: Use create_work_plane() for angled features
-    3. **Project edges**: Use project_edges() when sketching on complex surfaces
-    
-    ### Phase 6: Export
-    1. **Export STEP**: Use export_step() for CAD compatibility
-    2. **Export STL**: Use export_stl() for 3D printing or CNC
-    
-    ## KEY MEASUREMENTS (in cm, where 1 unit = 1 cm = 10mm):
-    - Wall thickness: 0.3-0.5 cm (3-5mm)
-    - Motherboard clearance: 2-3 cm
-    - ATX motherboard: 30.5 × 24.4 cm
-    - MicroATX: 24.4 × 24.4 cm
-    - Mini-ITX: 17 × 17 cm
-    - PSU standard: 15 × 8.6 × 14 cm (ATX)
-    - Mounting hole diameter: 0.3-0.4 cm (3-4mm)
-    - Ventilation holes: 0.5-1.5 cm hexagons
-    
-    ## EXAMPLE: Basic PC Case Shell
-    
-    STEP 1: Clear and create main body
-    - delete_all()
-    - draw_box(height="30", width="40", depth="45", x=0, y=0, z=0, plane="XY")
-    
-    STEP 2: Hollow out
-    - shell_body(thickness=0.4, faceindex=4)  # Remove top face
-    
-    STEP 3: Create front panel with vents
-    - sketch_on_face(body_index=-1, face_index=0)
-    - draw_polygon(sides=6, radius=0.8, x=0, y=0, z=0, plane="XY")
-    - rectangular_pattern(plane="XY", quantity_one=5, quantity_two=8, 
-                         distance_one=30, distance_two=30, axis_one="X", axis_two="Y")
-    - pocket_recess(depth=0.5)
-    
-    STEP 4: Add motherboard mounting holes
-    - sketch_on_face(body_index=-1, face_index=2)  # Side panel
-    - draw_holes(points=[[2.44, 5.08], [2.44, 16.51], [2.44, 22.86], 
-                         [16.51, 2.54], [16.51, 22.86], [28.45, 2.54], 
-                         [28.45, 16.51], [28.45, 22.86]], 
-                 width=0.35, depth=0.5, faceindex=2)
-    
-    STEP 5: Round edges
-    - fillet_edges(radius=0.3)
-    
-    STEP 6: Export
-    - export_step(name="prop_replica_case")
-    - export_stl(name="prop_replica_case")
-    
-    ## TIPS FOR PROP REPLICAS:
-    1. **Reference images**: Study the reference prop carefully for accurate proportions
-    2. **Layer approach**: Build complex shapes in layers using loft() or multiple extrudes
-    3. **Detail levels**: Start with basic shape, then add details progressively
-    4. **Functional requirements**: Remember this will house PC components - plan clearances
-    5. **Printability**: Consider 3D printing orientation and support requirements
-    6. **Assembly**: Design parts that can be printed/fabricated separately and assembled
-    
-    ## TOOLS AVAILABLE FOR COMPLEX MODELING:
-    - Basic shapes: draw_box, draw_cylinder, draw_sphere, draw_polygon
-    - Sketching: draw_lines, draw_one_line, draw2Dcircle, spline, arc, ellipsie
-    - Features: extrude, extrude_thin, revolve, sweep, loft
-    - Modifications: cut_extrude, pocket_recess, fillet_edges, shell_body
-    - Patterns: circular_pattern, rectangular_pattern, mirror_feature
-    - Advanced: sketch_on_face, create_work_plane, project_edges, offset_surface
-    - Boolean: boolean_operation (cut, join, intersect)
-    - Hardware: draw_holes, create_thread
-    - Export: export_step, export_stl
-    
-    Remember: 1 unit = 1 cm = 10mm in Fusion 360!
-    """
-
-
-@mcp.prompt()
-def custom_prop_case_from_reference():
-    """
-    Specialized prompt for creating a prop replica PC case from reference images.
-    This workflow helps convert any prop design into a functional PC case.
-    """
-    return """
-    # Custom Prop Replica to PC Case Conversion
-    
-    I will help you convert a prop replica into a functional custom PC case.
-    
-    ## STEP-BY-STEP PROCESS:
-    
-    ### 1. ANALYZE REFERENCE
-    First, I need to understand the prop:
-    - What is the overall shape? (box, cylinder, organic, etc.)
-    - What are the approximate dimensions?
-    - Are there any distinctive features? (panels, angles, details)
-    - What motherboard size do you want to support? (ATX/mATX/ITX)
-    
-    ### 2. CREATE BASE STRUCTURE
-    I will create the main body matching the prop's exterior:
-    - Use delete_all() to clear workspace
-    - Build primary structure with draw_box(), draw_cylinder(), or combination
-    - Use loft() or sweep() for complex organic shapes
-    - Add any major panels or sections
-    
-    ### 3. HOLLOW FOR COMPONENTS
-    Convert solid model to case:
-    - Use shell_body() to create interior space (4-5mm walls typical)
-    - OR use extrude_thin() for specific wall sections
-    - Ensure adequate clearance for components:
-      * ATX motherboard: 30.5 × 24.4 cm + 2cm clearance
-      * GPU: up to 35cm length, 15cm height
-      * PSU: 15 × 8.6 × 14 cm + 1cm clearance
-      * CPU cooler: up to 17cm height
-    
-    ### 4. ADD FUNCTIONAL FEATURES
-    Make it a working PC case:
-    
-    A. Motherboard mounting:
-    - sketch_on_face() on interior side panel
-    - draw_holes() for standoffs at standard positions
-    - ATX pattern: [[2.44, 5.08], [2.44, 16.51], [2.44, 22.86], 
-                    [16.51, 2.54], [16.51, 22.86], [28.45, 2.54], 
-                    [28.45, 16.51], [28.45, 22.86]]
-    
-    B. Ventilation (critical for cooling):
-    - Identify front/top/bottom panels
-    - Use sketch_on_face() on ventilation areas
-    - draw_polygon(sides=6) for hex vents (popular design)
-    - rectangular_pattern() to create vent array
-    - pocket_recess() or cut_extrude() to cut through
-    - Aim for 30-40% open area on intake/exhaust
-    
-    C. PSU mounting:
-    - sketch_on_face() on PSU location (usually bottom or top)
-    - draw_holes() for 4 standard PSU screw holes
-    - Pattern: [[7.5, 3.5], [7.5, 10.5], [22.5, 3.5], [22.5, 10.5]]
-    
-    D. I/O cutout:
-    - sketch_on_face() on rear panel
-    - draw_box() for motherboard I/O shield (15.8 × 4.4 cm)
-    - cut_extrude() to cut through panel
-    
-    E. Drive bays (if needed):
-    - sketch_on_face() on interior
-    - draw_holes() for 2.5" SSD or 3.5" HDD mounting
-    
-    ### 5. AESTHETIC DETAILS
-    Match the prop's appearance:
-    - Use pocket_recess() for panel insets
-    - Use fillet_edges() for rounded edges (typical 0.2-0.5cm)
-    - Add decorative elements with sweep(), loft(), or revolve()
-    - Use draw_text() for labels or logos
-    - Use mirror_feature() for symmetrical details
-    
-    ### 6. CABLE MANAGEMENT
-    Add practical features:
-    - Use pocket_recess() for cable routing channels
-    - Use draw_holes() for cable tie-down points
-    - Create cable pass-through holes between sections
-    
-    ### 7. ASSEMBLY CONSIDERATIONS
-    Design for fabrication:
-    - Use create_work_plane() to split large parts
-    - Add alignment features (pins with draw_cylinder())
-    - Include screw bosses for panel attachment
-    - Consider print bed size limitations
-    
-    ### 8. FINISHING TOUCHES
-    - Use fillet_edges() on all sharp external edges
-    - Verify all clearances
-    - Check wall thicknesses (minimum 3mm)
-    
-    ### 9. EXPORT
-    - export_step(name="prop_case_main_body") for each major part
-    - export_stl(name="prop_case_panel_1") for 3D printing
-    
-    ## EXAMPLE DIALOGUE:
-    
-    User: "I want to make a prop replica case based on [reference]"
-    
-    AI: "I'll help you create that! Let me start by understanding the prop:
-    1. What are the rough dimensions? (e.g., 40cm × 45cm × 35cm)
-    2. What motherboard size? (ATX, MicroATX, or Mini-ITX)
-    3. Any specific features you want to preserve from the prop?
-    
-    Let me start with the basic structure..."
-    
-    [AI creates base structure]
-    
-    AI: "I've created the main body. Now let's add the functional PC components:
-    - Adding motherboard mounting holes...
-    - Creating ventilation pattern...
-    - Adding PSU mount...
-    
-    Would you like me to add any specific decorative details?"
-    
-    ## KEY REMINDERS:
-    - 1 unit = 1 cm = 10mm in Fusion 360
-    - Always delete_all() before starting
-    - Work progressively: structure → function → details
-    - Test component clearances before finalizing
-    - Export both STEP (for modification) and STL (for printing)
-    
-    Ready to start! Please describe your prop replica or confirm dimensions.
-    """
-
 
 
 

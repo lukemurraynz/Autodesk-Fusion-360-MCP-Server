@@ -12,24 +12,12 @@ Fusion MCP Integration bridges AI assistants with Autodesk Fusion 360 through th
 - 🤖 **AI-Driven Automation** - Automate repetitive modeling tasks
 - 🔧 **Parametric Control** - Dynamically modify design parameters
 - 🎓 **Accessible CAD** - Lower the barrier for non-CAD users
-- 🎨 **Prop Replicas & Custom PC Cases** - Convert any design into functional enclosures
+- 🎨 **Complex Models** - Create prop replicas, custom enclosures, and functional designs
 
 > **Note:** This is designed as an assistive tool and educational project, not a replacement for professional CAD workflows.
 > Projects like this can assist people with no experience in CAD workflows.
 
 > **Goal:** Enable conversational CAD and AI-driven automation in Fusion.
-
-### 🌟 New: Prop Replica PC Case Support
-
-This MCP server now includes comprehensive tools and workflows for creating **prop replicas that function as custom PC cases**. Whether you're building a sci-fi themed case, retro computer replica, or any unique design, the AI assistant can guide you through:
-
-- Converting reference images into 3D models
-- Adding functional PC component mounting (motherboard, PSU, drives)
-- Designing ventilation systems for proper cooling
-- Creating assembly-ready parts for 3D printing or CNC
-- Exporting production-ready files (STEP, STL)
-
-**See [PROP_REPLICA_GUIDE.md](PROP_REPLICA_GUIDE.md) for detailed instructions and examples.**
 
 ---
 
@@ -178,33 +166,6 @@ Then type
 Now you will see a list of predetermined Prompts.   
 ### Configured in Claude   
 Just open Claude, an ask for the FusionMCP
-
----
-
-## 🎨 Creating Prop Replica PC Cases
-
-This MCP server includes specialized prompts for creating prop replicas as functional PC cases:
-
-### Available Prompts:
-- **`prop_replica_pc_case`** - Comprehensive workflow for prop replica to PC case conversion
-- **`custom_prop_case_from_reference`** - Interactive step-by-step guide for converting any prop
-
-### Quick Start:
-1. Activate Fusion Add-in
-2. Start MCP server
-3. In Claude/Copilot, ask: "I want to create a prop replica PC case"
-4. Follow the AI's guided workflow
-
-### What You Can Create:
-- Sci-fi themed cases (e.g., portal gun, spaceship panel)
-- Retro computer replicas (e.g., 1980s terminal)
-- Game prop cases (e.g., weapon crates, control panels)
-- Movie prop cases (e.g., futuristic devices)
-- Custom artistic designs
-
-**📖 Documentation:**
-- **New Users**: [PROP_REPLICA_QUICK_START.md](PROP_REPLICA_QUICK_START.md) - Get started in 5 minutes
-- **Detailed Guide**: [PROP_REPLICA_GUIDE.md](PROP_REPLICA_GUIDE.md) - Complete documentation with examples
 
 ---
 
