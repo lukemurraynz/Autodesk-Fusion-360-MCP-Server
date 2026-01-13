@@ -140,7 +140,7 @@ def send_request(endpoint, data, headers):
                 if attempt == max_retries - 1:
                     raise
                 # Add delay before retry to give Fusion time to process
-                time.sleep(2)
+                time.sleep(config.RETRY_DELAY)
 
         except requests.RequestException as e:
             logging.error("Request failed on attempt %d: %s", attempt + 1, e)
@@ -150,7 +150,7 @@ def send_request(endpoint, data, headers):
                 raise
             
             # Add delay before retry to give Fusion time to process
-            time.sleep(2)
+            time.sleep(config.RETRY_DELAY)
 
         except Exception as e:
             logging.error("Unexpected error: %s", e)
