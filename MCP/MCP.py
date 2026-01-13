@@ -1550,6 +1550,12 @@ def export_as_STEP(design, ui,Name):
             ui.messageBox('Failed export_as_STEP:\n{}'.format(traceback.format_exc()))
 
 def cut_extrude(design,ui,depth):
+    """
+    Creates a cut extrude by cutting the last sketch into a body.
+    
+    IMPORTANT: The sketch must be positioned on or near an existing body.
+    The sketch profile must intersect with the body to create a valid cut.
+    """
     try:
         rootComp = design.rootComponent 
         sketches = rootComp.sketches
@@ -1558,7 +1564,9 @@ def cut_extrude(design,ui,depth):
         # Check if there are any bodies to cut into
         if bodies.count == 0:
             if ui:
-                ui.messageBox("No target body found to cut or intersect! Please create a body first before using cut_extrude.")
+                ui.messageBox("No target body found to cut or intersect!\n\n"
+                             "Please create a body first before using cut_extrude.\n\n"
+                             "Tip: Use draw_box, draw_cylinder, or other creation tools to make a body first.")
             return
         
         # Check if there are any sketches
@@ -1580,10 +1588,27 @@ def cut_extrude(design,ui,depth):
         extrudeInput = extrudes.createInput(prof,adsk.fusion.FeatureOperations.CutFeatureOperation)
         distance = adsk.core.ValueInput.createByReal(depth)
         extrudeInput.setDistanceExtent(False, distance)
-        extrudes.add(extrudeInput)
-    except:
+        
+        try:
+            extrudes.add(extrudeInput)
+        except RuntimeError as e:
+            error_msg = str(e)
+            if "No target body found" in error_msg or "cut or intersect" in error_msg:
+                if ui:
+                    ui.messageBox("Failed to create cut: The sketch profile does not intersect with any existing body!\n\n"
+                                 "Possible causes:\n"
+                                 "1. The sketch is not positioned on/near a body face\n"
+                                 "2. The sketch was created on a different plane than the body\n"
+                                 "3. Use 'sketch_on_face' to create sketches directly on body faces\n\n"
+                                 "Solution: Position your sketch so it overlaps with the body you want to cut.")
+            else:
+                if ui:
+                    ui.messageBox(f'Failed to create cut:\n{error_msg}')
+            return
+            
+    except Exception as e:
         if ui:
-            ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+            ui.messageBox('Failed cut_extrude:\n{}'.format(traceback.format_exc()))
 
 
 def extrude_thin(design, ui, thickness,distance):
