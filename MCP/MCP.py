@@ -1042,6 +1042,13 @@ def draw_one_line(design, ui, x1, y1, z1, x2, y2, z2, plane="XY"):
     try:
         rootComp = design.rootComponent
         sketches = rootComp.sketches
+        
+        # Check if there are any sketches before accessing
+        if sketches.count == 0:
+            if ui:
+                ui.messageBox('No sketches found. Please create a sketch first (e.g., using arc or draw_lines).')
+            return
+        
         sketch = sketches.item(sketches.count - 1)
         
         start = adsk.core.Point3D.create(x1, y1, 0)
@@ -1067,12 +1074,25 @@ def loft(design, ui, sketchcount):
         sketches = rootComp.sketches
         loftFeatures = rootComp.features.loftFeatures
         
+        # Check if there are enough sketches
+        if sketches.count < sketchcount:
+            if ui:
+                ui.messageBox(f"Loft requires {sketchcount} sketches, but only {sketches.count} found. Please create more sketches.")
+            return
+        
         loftInput = loftFeatures.createInput(adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         loftSectionsObj = loftInput.loftSections
         
         # Add profiles from the last 'sketchcount' sketches
         for i in range(sketchcount):
             sketch = sketches.item(sketches.count - 1 - i)
+            
+            # Check if sketch has profiles
+            if sketch.profiles.count == 0:
+                if ui:
+                    ui.messageBox(f"Sketch {sketches.count - 1 - i} has no closed profiles. Please draw closed shapes.")
+                return
+            
             profile = sketch.profiles.item(0)
             loftSectionsObj.add(profile)
         
@@ -1134,22 +1154,47 @@ def boolean_operation(design,ui,op):
 
 
 def sweep(design,ui):
+    try:
         rootComp = design.rootComponent
         sketches = rootComp.sketches
         sweeps = rootComp.features.sweepFeatures
+        
+        # Check if there are at least 2 sketches for sweep
+        if sketches.count < 2:
+            if ui:
+                ui.messageBox("Sweep requires at least 2 sketches (profile and path). Please create sketches first.")
+            return
 
-        profsketch = sketches.item(sketches.count - 2)  # Letzter Sketch
-        prof = profsketch.profiles.item(0) # Letztes Profil im Sketch also der Kreis
-        pathsketch = sketches.item(sketches.count - 1) # take the last sketch as path
+        profsketch = sketches.item(sketches.count - 2)  # Profile sketch
+        
+        # Check if profile sketch has profiles
+        if profsketch.profiles.count == 0:
+            if ui:
+                ui.messageBox("Profile sketch has no closed profiles. Please draw a closed shape for the profile.")
+            return
+        
+        prof = profsketch.profiles.item(0)  # First profile in the sketch
+        
+        pathsketch = sketches.item(sketches.count - 1)  # Path sketch
+        
+        # Check if path sketch has curves
+        if pathsketch.sketchCurves.count == 0:
+            if ui:
+                ui.messageBox("Path sketch has no curves. Please draw a path for the sweep.")
+            return
+        
         # collect all sketch curves in an ObjectCollection
         pathCurves = adsk.core.ObjectCollection.create()
         for i in range(pathsketch.sketchCurves.count):
             pathCurves.add(pathsketch.sketchCurves.item(i))
 
-    
-        path = adsk.fusion.Path.create(pathCurves, 0) # connec
+        path = adsk.fusion.Path.create(pathCurves, 0)
         sweepInput = sweeps.createInput(prof, path, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         sweeps.add(sweepInput)
+    except:
+        if ui:
+            ui.messageBox('Failed sweep:\n{}'.format(traceback.format_exc()))
+
 
 
 def extrude_last_sketch(design, ui, value,taperangle):
@@ -1159,7 +1204,21 @@ def extrude_last_sketch(design, ui, value,taperangle):
     try:
         rootComp = design.rootComponent 
         sketches = rootComp.sketches
+        
+        # Check if there are any sketches
+        if sketches.count == 0:
+            if ui:
+                ui.messageBox("No sketches found. Please create a sketch first.")
+            return
+        
         sketch = sketches.item(sketches.count - 1)  # Letzter Sketch
+        
+        # Check if the sketch has profiles
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
+            return
+        
         prof = sketch.profiles.item(0)  # Erstes Profil im Sketch
         extrudes = rootComp.features.extrudeFeatures
         extrudeInput = extrudes.createInput(prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -1424,7 +1483,21 @@ def cut_extrude(design,ui,depth):
     try:
         rootComp = design.rootComponent 
         sketches = rootComp.sketches
+        
+        # Check if there are any sketches
+        if sketches.count == 0:
+            if ui:
+                ui.messageBox("No sketches found. Please create a sketch first.")
+            return
+        
         sketch = sketches.item(sketches.count - 1)  # Letzter Sketch
+        
+        # Check if the sketch has profiles
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
+            return
+        
         prof = sketch.profiles.item(0)  # Erstes Profil im Sketch
         extrudes = rootComp.features.extrudeFeatures
         extrudeInput = extrudes.createInput(prof,adsk.fusion.FeatureOperations.CutFeatureOperation)
@@ -1437,21 +1510,39 @@ def cut_extrude(design,ui,depth):
 
 
 def extrude_thin(design, ui, thickness,distance):
-    rootComp = design.rootComponent
-    sketches = rootComp.sketches
-    
-    #ui.messageBox('Select a face for the extrusion.')
-    #selectedFace = ui.selectEntity('Select a face for the extrusion.', 'Profiles').entity
-    selectedFace = sketches.item(sketches.count - 1).profiles.item(0)
-    exts = rootComp.features.extrudeFeatures
-    extInput = exts.createInput(selectedFace, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-    extInput.setThinExtrude(adsk.fusion.ThinExtrudeWallLocation.Center,
-                            adsk.core.ValueInput.createByReal(thickness))
+    try:
+        rootComp = design.rootComponent
+        sketches = rootComp.sketches
+        
+        # Check if there are any sketches
+        if sketches.count == 0:
+            if ui:
+                ui.messageBox("No sketches found. Please create a sketch first.")
+            return
+        
+        sketch = sketches.item(sketches.count - 1)
+        
+        # Check if the sketch has profiles
+        if sketch.profiles.count == 0:
+            if ui:
+                ui.messageBox("Sketch has no closed profiles. Please draw a closed shape.")
+            return
+        
+        #ui.messageBox('Select a face for the extrusion.')
+        #selectedFace = ui.selectEntity('Select a face for the extrusion.', 'Profiles').entity
+        selectedFace = sketch.profiles.item(0)
+        exts = rootComp.features.extrudeFeatures
+        extInput = exts.createInput(selectedFace, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+        extInput.setThinExtrude(adsk.fusion.ThinExtrudeWallLocation.Center,
+                                adsk.core.ValueInput.createByReal(thickness))
 
-    distanceExtent = adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(distance))
-    extInput.setOneSideExtent(distanceExtent, adsk.fusion.ExtentDirections.PositiveExtentDirection)
+        distanceExtent = adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(distance))
+        extInput.setOneSideExtent(distanceExtent, adsk.fusion.ExtentDirections.PositiveExtentDirection)
 
-    ext = exts.add(extInput)
+        ext = exts.add(extInput)
+    except:
+        if ui:
+            ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
 
 def draw_cylinder(design, ui, radius, height, x,y,z,plane = "XY"):
