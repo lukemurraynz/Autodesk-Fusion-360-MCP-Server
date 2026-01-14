@@ -1382,6 +1382,89 @@ def close_sketch(sketch_id = None):
 
 
 @mcp.tool()
+def select_body(body_name: str):
+    """
+    Selects a body by its name and returns the body object for further operations.
+
+    This tool allows you to target specific bodies by name when working with multiple bodies
+    in your design. Useful for operations that need to reference a specific body.
+
+    :param body_name: The name of the body to select (e.g., "Body1", "HexColumn", "BasePlatform")
+    :return: {
+        "success": true/false,
+        "body_name": "selected body name",
+        "body_id": "entity token",
+        "error": "error message if failed"
+    }
+
+    **Usage Example:**
+    ```python
+    # After creating and naming bodies
+    rename_body(body_id=0, new_name="BasePlatform")
+    rename_body(body_id=1, new_name="Column")
+
+    # Select a specific body by name for operations
+    body = select_body(body_name="BasePlatform")
+    if body["success"]:
+        print(f"Selected: {body['body_name']}")
+    ```
+
+    **Note:** This is primarily used internally by Fusion operations.
+    For most workflows, use list_bodies() and reference bodies by index or ID directly.
+    """
+    try:
+        endpoint = config.ENDPOINTS["select_body"]
+        payload = {
+            "name": body_name
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Select body failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def select_sketch(sketch_name: str):
+    """
+    Selects a sketch by its name and returns the sketch object for further operations.
+
+    This tool allows you to target specific sketches by name when working with multiple sketches
+    in your design. Useful for operations that need to reference a specific sketch.
+
+    :param sketch_name: The name of the sketch to select (e.g., "Sketch1", "ProfileSketch")
+    :return: {
+        "success": true/false,
+        "sketch_name": "selected sketch name",
+        "sketch_id": "entity token",
+        "error": "error message if failed"
+    }
+
+    **Usage Example:**
+    ```python
+    # Select a specific sketch by name for operations
+    sketch = select_sketch(sketch_name="Sketch1")
+    if sketch["success"]:
+        print(f"Selected: {sketch['sketch_name']}")
+        activate_sketch(sketch["sketch_id"])
+    ```
+
+    **Note:** For most workflows, use list_sketches() and activate_sketch() with index/ID.
+    This tool is helpful when you need to programmatically reference sketches by name.
+    """
+    try:
+        endpoint = config.ENDPOINTS["select_sketch"]
+        payload = {
+            "name": sketch_name
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Select sketch failed: %s", e)
+        raise
+
+
+@mcp.tool()
 def check_shell_status(body_id = 0):
     """
     Checks if a body has already been shelled to prevent duplicate shell operations.

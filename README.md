@@ -1,8 +1,6 @@
 # Fusion MCP Integration
 
-
 https://github.com/user-attachments/assets/46c8140e-377d-4618-a304-03861cb3d7d9
-
 
 ## 🎯 About
 
@@ -23,7 +21,6 @@ Fusion MCP Integration bridges AI assistants with Autodesk Fusion 360 through th
 
 ---
 
-
 # Setup
 
 **I highly recommend to do everything inside Visual Studio Code or an other IDE**
@@ -31,26 +28,26 @@ Fusion MCP Integration bridges AI assistants with Autodesk Fusion 360 through th
 ---
 
 ## Requirements
-| Requirement | Link |
-|------------|------|
-| Python 3.10+ | https://python.org |
+
+| Requirement         | Link                           |
+| ------------------- | ------------------------------ |
+| Python 3.10+        | https://python.org             |
 | Autodesk Fusion 360 | https://autodesk.com/fusion360 |
-| Claude Desktop | https://claude.ai/download |
-| VS Code | https://code.visualstudio.com |
+| Claude Desktop      | https://claude.ai/download     |
+| VS Code             | https://code.visualstudio.com  |
 
 ---
 
 ## Clone Repository
+
 ```bash
 git clone https://github.com/JustusBraitinger/FusionMCP
 ```
 
-
 > **Important:** Do **NOT** start the Add-In yet.
 
-
-
 ## Install Python Dependencies
+
 ```bash
 cd Server
 python -m venv venv
@@ -59,43 +56,52 @@ python -m venv venv
 ### Activate venv
 
 **Windows PowerShell**
+
 ```powershell
 .\venv\Scripts\Activate
 ```
 
 ### Install packages
+
 ```bash
 pip install -r requirements.txt
 pip install "mcp[cli]"
 ```
+
 ## Installing the MCP Add-In for Fusion 360
 
 ```bash
 cd ..
 python Install_Addin.py
 ```
+
 ---
 
 ## Connect to Claude
-The most simple way to add the MCP-Server to Claude Desktop is to run following command:  
+
+The most simple way to add the MCP-Server to Claude Desktop is to run following command:
+
 ```bash
 cd Server
 uv run mcp install MCP_Server.py
 ```
-The output should be like this:    
+
+The output should be like this:
 
 ```bash
 [11/13/25 08:42:37] INFO     Added server 'Fusion' to Claude config
-                    INFO     Successfully installed Fusion in Claude app                                                                                                                                                               
+                    INFO     Successfully installed Fusion in Claude app
 ```
 
 # Alternative
 
 ### Modify Claude Config
-In Claude Desktop go to:  
+
+In Claude Desktop go to:
 **Settings → Developer → Edit Config**
 
 Add this block (change the path for your system):
+
 ```json
 {
   "mcpServers": {
@@ -111,10 +117,11 @@ Add this block (change the path for your system):
   }
 }
 ```
+
 > **Note:** Windows paths require double backslashes `\\`
 
-
 ### Using the MCP in Claude
+
 1. Restart Claude if needed (force close if not visible)
 2. Click **➕ Add** (bottom left of chat)
 3. Select **Add from Fusion**
@@ -125,11 +132,13 @@ Add this block (change the path for your system):
 ## Use MCP in VS Code (Copilot)
 
 Create or edit the file:
+
 ```
 %APPDATA%\Code\User\globalStorage\github.copilot-chat\mcp.json
 ```
 
 Paste:
+
 ```json
 {
   "servers": {
@@ -143,11 +152,13 @@ Paste:
 ```
 
 ### Alternative Setup in VS Code
+
 1. Press **CTRL + SHIFT + P** → search **MCP** → choose:
 2. **Add MCP**
 3. **HTTP**
 4. Enter:
 5. Name your MCP **`FusionMCP`**!!
+
 ```
 http://127.0.0.1:8000/sse
 ```
@@ -155,18 +166,27 @@ http://127.0.0.1:8000/sse
 ---
 
 ## Try It Out 😄
+
 Activate the Fusion Addin inside Fusion
+
 ### Configured in VS-Code:
+
 Start the server:
+
 ```bash
 python MCP_Server.py
 ```
-Then type   
+
+Then type
+
 ```
 /mcp.FusionMCP
 ```
-Now you will see a list of predetermined Prompts.   
-### Configured in Claude   
+
+Now you will see a list of predetermined Prompts.
+
+### Configured in Claude
+
 Just open Claude, an ask for the FusionMCP
 
 ---
@@ -177,8 +197,9 @@ Just open Claude, an ask for the FusionMCP
 See [Prop Modeling Features](./examples/PROP_MODELING_FEATURES.md) for detailed documentation and [Stargate Console Example](./examples/stargate_console_example.md) for a complete workflow.
 
 Key new capabilities:
-- **Body Management**: `list_bodies()`, `get_active_body()`, `rename_body()`
-- **Sketch Management**: `list_sketches()`, `get_active_sketch()`, `activate_sketch()`, `close_sketch()`
+
+- **Body Management**: `list_bodies()`, `get_active_body()`, `rename_body()`, `select_body()`
+- **Sketch Management**: `list_sketches()`, `get_active_sketch()`, `activate_sketch()`, `close_sketch()`, `select_sketch()`
 - **Enhanced Extrude**: Returns `body_id` for tracking
 - **Explicit Targeting**: `pocket_recess(depth, body_id, sketch_id)`
 - **Pattern Confirmation**: `circular_pattern()` returns instance count and pattern ID
@@ -188,74 +209,72 @@ Key new capabilities:
 
 ### ✏️ Sketching & Creation Tools
 
-| Tool | Description |
-| :--- | :--- |
-| **Draw 2D circle** | Draws a 2D **circle** at a specified position and plane. |
-| **Ellipsie** | Generates an **ellipse** (elliptical curve) in the sketching plane. |
-| **Draw lines** | Creates a **polyline** (multiple connected lines) as a sketch. |
-| **Draw one line** | Draws a single line between two 3D points. |
-| **3-Point Arc** | Draws a **circular arc** based on three defined points. |
-| **Spline** | Draws a **Spline curve** through a list of 3D points (used for sweep path). |
-| **Draw box** | Creates a **box** (solid body) with definable dimensions and position. |
-| **Draw cylinder** | Draws a **cylinder** (solid body). |
-| **Draw polygon** | Creates a **regular polygon** (triangle, hexagon, octagon, etc.) with specified number of sides. |
-| **Draw text**| Draws a text and extrudes it with given values |
-| **Draw Witzenmann logo** | A **fun demo function** for creating the Witzenmann logo. |
+| Tool                     | Description                                                                                      |
+| :----------------------- | :----------------------------------------------------------------------------------------------- |
+| **Draw 2D circle**       | Draws a 2D **circle** at a specified position and plane.                                         |
+| **Ellipsie**             | Generates an **ellipse** (elliptical curve) in the sketching plane.                              |
+| **Draw lines**           | Creates a **polyline** (multiple connected lines) as a sketch.                                   |
+| **Draw one line**        | Draws a single line between two 3D points.                                                       |
+| **3-Point Arc**          | Draws a **circular arc** based on three defined points.                                          |
+| **Spline**               | Draws a **Spline curve** through a list of 3D points (used for sweep path).                      |
+| **Draw box**             | Creates a **box** (solid body) with definable dimensions and position.                           |
+| **Draw cylinder**        | Draws a **cylinder** (solid body).                                                               |
+| **Draw polygon**         | Creates a **regular polygon** (triangle, hexagon, octagon, etc.) with specified number of sides. |
+| **Draw text**            | Draws a text and extrudes it with given values                                                   |
+| **Draw Witzenmann logo** | A **fun demo function** for creating the Witzenmann logo.                                        |
 
 ---
 
 ### ⚙️ Feature & Modification Tools
 
-| Tool | Description |
-| :--- | :--- |
-| **Extrude** | **Extrudes** the last active sketch by a given value to create a body. |
-| **Revolve** | Creates a revolved body by **revolving** a profile around an axis. |
-| **Sweep** | Executes a sweep feature using the previously created profile and spline path. |
-| **Loft** | Creates a complex body by **lofting** between a defined number of previously created sketches. |
-| **Thin extrusion** | Creates a **thin-walled extrusion** (extrusion with constant wall thickness). |
-| **Cut extrude** | Removes material from a body by **cutting** a sketch (as a hole/pocket). |
-| **Pocket/Recess** | Creates a **pocket or recess** in an existing body by cutting the last sketch into it. Perfect for creating depressions and recesses. |
-| **Draw holes** | Creates **Counterbore holes** at specified points on a surface (`faceindex`). |
-| **Fillet edges** | Rounds sharp edges with a defined **radius** (fillet). |
-| **Shell body** | **Hollows** out the body, leaving a uniform wall thickness. |
-| **Circular pattern** | Creates a **circular pattern** (array) of features or bodies around an axis. |
-| **Rectangular pattern**| Creates a **rectangular pattern** of a body|
-| **Mirror feature** | **Mirrors** a body across a plane (XY, XZ, or YZ) for creating symmetric features. |
-| **Offset surface** | Creates an **offset surface** by offsetting faces inward/outward by a specified distance. |
-
+| Tool                    | Description                                                                                                                           |
+| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| **Extrude**             | **Extrudes** the last active sketch by a given value to create a body.                                                                |
+| **Revolve**             | Creates a revolved body by **revolving** a profile around an axis.                                                                    |
+| **Sweep**               | Executes a sweep feature using the previously created profile and spline path.                                                        |
+| **Loft**                | Creates a complex body by **lofting** between a defined number of previously created sketches.                                        |
+| **Thin extrusion**      | Creates a **thin-walled extrusion** (extrusion with constant wall thickness).                                                         |
+| **Cut extrude**         | Removes material from a body by **cutting** a sketch (as a hole/pocket).                                                              |
+| **Pocket/Recess**       | Creates a **pocket or recess** in an existing body by cutting the last sketch into it. Perfect for creating depressions and recesses. |
+| **Draw holes**          | Creates **Counterbore holes** at specified points on a surface (`faceindex`).                                                         |
+| **Fillet edges**        | Rounds sharp edges with a defined **radius** (fillet).                                                                                |
+| **Shell body**          | **Hollows** out the body, leaving a uniform wall thickness.                                                                           |
+| **Circular pattern**    | Creates a **circular pattern** (array) of features or bodies around an axis.                                                          |
+| **Rectangular pattern** | Creates a **rectangular pattern** of a body                                                                                           |
+| **Mirror feature**      | **Mirrors** a body across a plane (XY, XZ, or YZ) for creating symmetric features.                                                    |
+| **Offset surface**      | Creates an **offset surface** by offsetting faces inward/outward by a specified distance.                                             |
 
 ---
 
 ### 🔧 Advanced Sketching & Work Planes
 
-| Tool | Description |
-| :--- | :--- |
-| **Sketch on face** | Creates a **sketch directly on a face** of an existing body, enabling sketching on angled or curved surfaces. |
-| **Create work plane** | Creates a **construction/work plane** offset from existing geometry (XY, XZ, YZ planes or body faces). |
-| **Project edges** | **Projects edges** from a body onto the current sketch plane for reference and alignment. |
+| Tool                  | Description                                                                                                   |
+| :-------------------- | :------------------------------------------------------------------------------------------------------------ |
+| **Sketch on face**    | Creates a **sketch directly on a face** of an existing body, enabling sketching on angled or curved surfaces. |
+| **Create work plane** | Creates a **construction/work plane** offset from existing geometry (XY, XZ, YZ planes or body faces).        |
+| **Project edges**     | **Projects edges** from a body onto the current sketch plane for reference and alignment.                     |
 
 ---
 
 ### 📏 Analysis & Control
 
-| Tool | Description |
-| :--- | :--- |
-| **Count** | Counts the total number of all **model parameters**. |
-| **List parameters** | Lists all defined **model parameters** in detail. |
-| **Change parameter** | Changes the value of an existing named parameter in the model. |
-| **Test connection** | Tests the communication link to the Fusion 360 server. |
-| **Undo** | **Undoes** the last operation in Fusion 360. |
-| **Delete all** | **Deletes all objects** in the current Fusion 360 session (`destroy`). |
+| Tool                 | Description                                                            |
+| :------------------- | :--------------------------------------------------------------------- |
+| **Count**            | Counts the total number of all **model parameters**.                   |
+| **List parameters**  | Lists all defined **model parameters** in detail.                      |
+| **Change parameter** | Changes the value of an existing named parameter in the model.         |
+| **Test connection**  | Tests the communication link to the Fusion 360 server.                 |
+| **Undo**             | **Undoes** the last operation in Fusion 360.                           |
+| **Delete all**       | **Deletes all objects** in the current Fusion 360 session (`destroy`). |
 
 ---
 
 ### 💾 Export
 
-| Tool | Description |
-| :--- | :--- |
+| Tool            | Description                               |
+| :-------------- | :---------------------------------------- |
 | **Export STEP** | **Exports** the model as a **STEP** file. |
-| **Export STL** | **Exports** the model as an **STL** file. |
-
+| **Export STL**  | **Exports** the model as an **STL** file. |
 
 ---
 
@@ -264,20 +283,24 @@ Key new capabilities:
 These tools address limitations in multi-face feature creation and complex parametric relationships:
 
 ### ✨ Face-Based Modeling
+
 - **Sketch on Face**: Create sketches directly on angled faces (no more floating geometry!)
 - **Pocket/Recess**: Cut depressions into bodies with precise depth control
 - **Project Edges**: Reference existing body edges in your sketches for accurate alignment
 
 ### 📐 Construction Aids
+
 - **Work Planes**: Create offset reference planes from bodies or standard planes
 - **Polygon Tool**: Draw perfect hexagons, octagons, and other regular polygons
 - **Mirror Feature**: Create symmetric features across planes
 
 ### 🎯 Surface Operations
+
 - **Offset Surface**: Create parallel surfaces for wall thicknesses
 - **Advanced Extrude**: Use taper angles for beveled surfaces (via `extrude` with `angle` parameter)
 
 ### Example Workflow: Creating Panel Recesses
+
 ```python
 # 1. Create main body
 draw_box(height=10, width=10, depth=2, x=0, y=0, z=0)
@@ -298,16 +321,19 @@ mirror_feature(mirror_plane="XY")
 ## Architecture
 
 ### Server.py
+
 - Defines MCP server, tools, and prompts
 - Handles HTTP calls to Fusion add-in
 
 ### MCP.py
+
 - Fusion Add-in
 - Because the Fusion API is not thread-safe, this uses:
   - Custom event handler
   - Task queue
 
 ---
+
 ### Why This Architecture?
 
 The Fusion 360 API is **not thread-safe** and requires all operations to run on the main UI thread. Our solution:
@@ -317,14 +343,17 @@ The Fusion 360 API is **not thread-safe** and requires all operations to run on 
 3. **Async Bridge** - HTTP server handles async MCP requests
 
 ### Known Limitations
+
 The integration has some workflow constraints due to Fusion API behavior:
+
 - Face topology changes after boolean operations (pockets, cuts)
 - Sketch re-creation limitations on same faces
 - Timing constraints for rapid-fire operations
 
 **See [Known Limitations](./KNOWN_LIMITATIONS.md) for details and workarounds.**
-   
+
 ## Security Considerations 🔒
+
 - Local execution → safe by default
 - Currently HTTP (OK locally, insecure on networks)
 - Validate tool inputs to avoid prompt injection
@@ -350,12 +379,11 @@ The integration has some workflow constraints due to Fusion API behavior:
 
 **This is a proof-of-concept, not production software.**
 
+# Note
 
-# Note #
-I did not know about script generation MCP workflows, because I am pretty new to this Software world    
+I did not know about script generation MCP workflows, because I am pretty new to this Software world
 If you want to build it yourself i suggest you look into that concept
 
-
-
 ## Contact
+
 justus@braitinger.org

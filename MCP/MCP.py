@@ -25,7 +25,9 @@ query_results = {
     'extrude': None,
     'pocket_recess': None,
     'circular_pattern': None,
-    'fillet_edges': None
+    'fillet_edges': None,
+    'select_body': None,
+    'select_sketch': None
 }
 
 # Event Handler Variablen
@@ -122,9 +124,11 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
         elif task[0] == 'extrude_thin':
             extrude_thin(design, ui, task[1],task[2])
         elif task[0] == 'select_body':
-            select_body(design, ui, task[1])
+            result = select_body(design, ui, task[1])
+            query_results['select_body'] = result
         elif task[0] == 'select_sketch':
-            select_sketch(design, ui, task[1])
+            result = select_sketch(design, ui, task[1])
+            query_results['select_sketch'] = result
         elif task[0] == 'spline':
             spline(design, ui, task[1], task[2])
         elif task[0] == 'sweep':
@@ -2385,30 +2389,78 @@ def holes(design, ui, points, width=1.0,distance = 1.0,faceindex=0):
 
 
 def select_body(design,ui,Bodyname):
+    """
+    Selects a body by name and returns information about it.
+    Returns: dict with success status, body_name, body_id, and error if failed
+    """
     try:
         rootComp = design.rootComponent
         target_body = rootComp.bRepBodies.itemByName(Bodyname)
+
         if target_body is None:
-            ui.messageBox(f"Body with the name:  '{Bodyname}' could not be found.")
+            error_msg = f"Body with the name '{Bodyname}' could not be found."
+            if ui:
+                ui.messageBox(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "body_name": Bodyname
+            }
 
-        return target_body
+        return {
+            "success": True,
+            "body_name": target_body.name,
+            "body_id": target_body.entityToken,
+            "index": rootComp.bRepBodies.find(target_body)
+        }
 
-    except :
-        if ui :
+    except Exception as e:
+        error_msg = f"Failed to select body: {str(e)}"
+        if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {
+            "success": False,
+            "error": error_msg,
+            "body_name": Bodyname
+        }
 
 def select_sketch(design,ui,Sketchname):
+    """
+    Selects a sketch by name and returns information about it.
+    Returns: dict with success status, sketch_name, sketch_id, and error if failed
+    """
     try:
         rootComp = design.rootComponent
         target_sketch = rootComp.sketches.itemByName(Sketchname)
+
         if target_sketch is None:
-            ui.messageBox(f"Sketch with the name:  '{Sketchname}' could not be found.")
+            error_msg = f"Sketch with the name '{Sketchname}' could not be found."
+            if ui:
+                ui.messageBox(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "sketch_name": Sketchname
+            }
 
-        return target_sketch
+        return {
+            "success": True,
+            "sketch_name": target_sketch.name,
+            "sketch_id": target_sketch.entityToken,
+            "index": rootComp.sketches.find(target_sketch),
+            "profile_count": target_sketch.profiles.count
+        }
 
-    except :
-        if ui :
+    except Exception as e:
+        error_msg = f"Failed to select sketch: {str(e)}"
+        if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {
+            "success": False,
+            "error": error_msg,
+            "sketch_name": Sketchname
+        }
+
 
 
 def list_bodies(design, ui):
@@ -4011,6 +4063,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/select_body':
+                result = query_results.get('select_body', {"success": False, "error": "No data available. Call POST /select_body first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/select_sketch':
+                result = query_results.get('select_sketch', {"success": False, "error": "No data available. Call POST /select_sketch first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
             # NEW ENHANCED TOOLS GET ENDPOINTS
             elif self.path == '/get_sketch_status':
                 result = query_results.get('get_sketch_status', {"success": False, "error": "No data available. Call POST /get_sketch_status first."})
@@ -4363,7 +4427,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Body wird ausgewählt"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Body selection requested",
+                    "note": "Results will be available via GET /select_body after processing (typically < 1 second)"
+                }).encode('utf-8'))
 
             elif path == '/select_sketch':
                 name = str(data.get('name', ''))
@@ -4372,7 +4439,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header('Content-type','application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"message": "Sketch wird ausgewählt"}).encode('utf-8'))
+                self.wfile.write(json.dumps({
+                    "message": "Sketch selection requested",
+                    "note": "Results will be available via GET /select_sketch after processing (typically < 1 second)"
+                }).encode('utf-8'))
 
             elif path == '/sweep':
                 # enqueue a tuple so process_task recognizes the command

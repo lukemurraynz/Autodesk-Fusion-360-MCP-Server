@@ -54,6 +54,8 @@ ENDPOINTS = {
     "get_active_sketch": f"{BASE_URL}/get_active_sketch",
     "activate_sketch": f"{BASE_URL}/activate_sketch",
     "close_sketch": f"{BASE_URL}/close_sketch",
+    "select_body": f"{BASE_URL}/select_body",
+    "select_sketch": f"{BASE_URL}/select_sketch",
 
     # NEW ENHANCED TOOLS - Phase 1-4
     "get_sketch_status": f"{BASE_URL}/get_sketch_status",
