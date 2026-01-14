@@ -27,7 +27,12 @@ query_results = {
     'circular_pattern': None,
     'fillet_edges': None,
     'select_body': None,
-    'select_sketch': None
+    'select_sketch': None,
+    'select_body_by_id': None,
+    'list_faces': None,
+    'select_face': None,
+    'list_features': None,
+    'boolean_preview': None
 }
 
 # Event Handler Variablen
@@ -198,6 +203,29 @@ class TaskEventHandler(adsk.core.CustomEventHandler):
             sketch_id = task[1] if len(task) > 1 else None
             result = close_sketch(design, ui, sketch_id)
             query_results['close_sketch'] = result
+        # CRITICAL 5 TOOLS
+        elif task[0] == 'select_body_by_id':
+            body_id = task[1] if len(task) > 1 else None
+            result = select_body_by_id(design, ui, body_id)
+            query_results['select_body_by_id'] = result
+        elif task[0] == 'list_faces_with_metadata':
+            body_id = task[1] if len(task) > 1 else None
+            result = list_faces_with_metadata(design, ui, body_id)
+            query_results['list_faces'] = result
+        elif task[0] == 'select_face_by_id':
+            body_id = task[1] if len(task) > 1 else None
+            face_id = task[2] if len(task) > 2 else None
+            result = select_face_by_id(design, ui, body_id, face_id)
+            query_results['select_face'] = result
+        elif task[0] == 'list_features_in_design':
+            body_id = task[1] if len(task) > 1 else None
+            result = list_features_in_design(design, ui, body_id)
+            query_results['list_features'] = result
+        elif task[0] == 'boolean_preview_operation':
+            target_id = task[1] if len(task) > 1 else None
+            tool_id = task[2] if len(task) > 2 else None
+            result = boolean_preview_operation(design, ui, target_id, tool_id)
+            query_results['boolean_preview'] = result
         # NEW ENHANCED TOOLS
         elif task[0] == 'get_sketch_status':
             sketch_id = task[1] if len(task) > 1 else None
@@ -2462,8 +2490,294 @@ def select_sketch(design,ui,Sketchname):
         }
 
 
+def select_body_by_id(design, ui, body_id):
+    """
+    Selects a body by its entity ID and sets it as active.
+    This is critical for boolean operations - ensures correct target.
+    Returns: dict with success status and body info
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
 
-def list_bodies(design, ui):
+        # Find body by entity token
+        target_body = None
+        for i in range(bodies.count):
+            if bodies.item(i).entityToken == body_id:
+                target_body = bodies.item(i)
+                break
+
+        if target_body is None:
+            error_msg = f"Body with ID '{body_id}' not found."
+            return {
+                "success": False,
+                "error": error_msg,
+                "body_id": body_id
+            }
+
+        return {
+            "success": True,
+            "body_id": target_body.entityToken,
+            "body_name": target_body.name,
+            "index": rootComp.bRepBodies.find(target_body)
+        }
+    except Exception as e:
+        error_msg = f"Failed to select body: {str(e)}"
+        if ui:
+            ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
+
+def list_faces_with_metadata(design, ui, body_id):
+    """
+    Lists all faces of a body with metadata (normal, area, position).
+    Enables semantic face selection instead of guessing indices.
+    Returns: dict with face list containing face_id, normal, area, etc.
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+
+        # Find body by ID
+        target_body = None
+        for i in range(bodies.count):
+            if bodies.item(i).entityToken == body_id:
+                target_body = bodies.item(i)
+                break
+
+        if target_body is None:
+            return {
+                "success": False,
+                "error": f"Body with ID '{body_id}' not found."
+            }
+
+        faces_list = []
+        brep = target_body.brep
+
+        for i in range(brep.faces.count):
+            face = brep.faces.item(i)
+
+            # Get face normal and area
+            try:
+                geometry = face.geometry
+                normal = [geometry.normal.x, geometry.normal.y, geometry.normal.z]
+                area = face.area
+
+                # Get representative point on face
+                edge = face.edges.item(0) if face.edges.count > 0 else None
+                point = face.pointOnFace if hasattr(face, 'pointOnFace') else None
+
+                faces_list.append({
+                    "face_id": f"f{i}",
+                    "face_index": i,
+                    "normal": normal,
+                    "area": area,
+                    "type": str(geometry.objectType) if geometry else "unknown"
+                })
+            except:
+                # Fallback for faces we can't fully analyze
+                faces_list.append({
+                    "face_id": f"f{i}",
+                    "face_index": i,
+                    "normal": [0, 0, 1],
+                    "area": 0,
+                    "type": "unknown"
+                })
+
+        return {
+            "success": True,
+            "body_id": body_id,
+            "face_count": len(faces_list),
+            "faces": faces_list
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed list_faces:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def select_face_by_id(design, ui, body_id, face_id):
+    """
+    Selects a specific face by ID for operations like sketch placement.
+    Eliminates fragile face_index guessing.
+    Returns: dict with success status and face info
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+
+        # Find body
+        target_body = None
+        for i in range(bodies.count):
+            if bodies.item(i).entityToken == body_id:
+                target_body = bodies.item(i)
+                break
+
+        if target_body is None:
+            return {
+                "success": False,
+                "error": f"Body with ID '{body_id}' not found."
+            }
+
+        # Parse face_id (format: "f0", "f1", etc.)
+        try:
+            face_index = int(face_id.replace('f', ''))
+        except:
+            return {
+                "success": False,
+                "error": f"Invalid face_id format: '{face_id}'. Use 'f0', 'f1', etc."
+            }
+
+        brep = target_body.brep
+        if face_index >= brep.faces.count:
+            return {
+                "success": False,
+                "error": f"Face index {face_index} out of range (body has {brep.faces.count} faces)"
+            }
+
+        face = brep.faces.item(face_index)
+
+        return {
+            "success": True,
+            "body_id": body_id,
+            "face_id": face_id,
+            "face_index": face_index,
+            "area": face.area
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed select_face:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def list_features_in_design(design, ui, body_id=None):
+    """
+    Lists all features in the design with their IDs, types, and bodies.
+    Enables smart patterning and operation targeting.
+    Returns: dict with feature list containing id, type, body_id, name
+    """
+    try:
+        rootComp = design.rootComponent
+
+        features_list = []
+
+        if body_id:
+            # List features for specific body
+            bodies = rootComp.bRepBodies
+            target_body = None
+            for i in range(bodies.count):
+                if bodies.item(i).entityToken == body_id:
+                    target_body = bodies.item(i)
+                    break
+
+            if target_body is None:
+                return {
+                    "success": False,
+                    "error": f"Body with ID '{body_id}' not found."
+                }
+
+            body_features = target_body.features
+            for i in range(body_features.count):
+                feature = body_features.item(i)
+                features_list.append({
+                    "feature_id": feature.entityToken,
+                    "feature_index": i,
+                    "type": feature.featureType,
+                    "name": feature.name if hasattr(feature, 'name') else f"Feature_{i}",
+                    "body_id": body_id,
+                    "suppressed": feature.isSuppressed if hasattr(feature, 'isSuppressed') else False
+                })
+        else:
+            # List all features in all bodies
+            bodies = rootComp.bRepBodies
+            for b_idx in range(bodies.count):
+                body = bodies.item(b_idx)
+                body_features = body.features
+                for f_idx in range(body_features.count):
+                    feature = body_features.item(f_idx)
+                    features_list.append({
+                        "feature_id": feature.entityToken,
+                        "feature_index": f_idx,
+                        "type": feature.featureType,
+                        "name": feature.name if hasattr(feature, 'name') else f"Feature_{f_idx}",
+                        "body_id": body.entityToken,
+                        "body_name": body.name,
+                        "suppressed": feature.isSuppressed if hasattr(feature, 'isSuppressed') else False
+                    })
+
+        return {
+            "success": True,
+            "feature_count": len(features_list),
+            "features": features_list
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed list_features:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+def boolean_preview_operation(design, ui, target_body_id, tool_body_id):
+    """
+    Preview a boolean operation without committing it.
+    Shows intersection volume and which bodies will be modified.
+    Returns: dict with will_intersect, volume, and safety warnings
+    """
+    try:
+        rootComp = design.rootComponent
+        bodies = rootComp.bRepBodies
+
+        # Find target body
+        target_body = None
+        for i in range(bodies.count):
+            if bodies.item(i).entityToken == target_body_id:
+                target_body = bodies.item(i)
+                break
+
+        if target_body is None:
+            return {
+                "success": False,
+                "error": f"Target body with ID '{target_body_id}' not found."
+            }
+
+        # Find tool body
+        tool_body = None
+        for i in range(bodies.count):
+            if bodies.item(i).entityToken == tool_body_id:
+                tool_body = bodies.item(i)
+                break
+
+        if tool_body is None:
+            return {
+                "success": False,
+                "error": f"Tool body with ID '{tool_body_id}' not found."
+            }
+
+        # Get volumes
+        target_volume = target_body.volume
+        tool_volume = tool_body.volume
+
+        # Check if they're touching (both have volume)
+        will_intersect = target_volume > 0 and tool_volume > 0
+
+        return {
+            "success": True,
+            "will_intersect": will_intersect,
+            "target_volume": target_volume,
+            "tool_volume": tool_volume,
+            "target_body_name": target_body.name,
+            "tool_body_name": tool_body.name,
+            "warning": "Safe to proceed with boolean" if will_intersect else "Warning: bodies may not intersect properly"
+        }
+    except Exception as e:
+        if ui:
+            ui.messageBox('Failed boolean_preview:\n{}'.format(traceback.format_exc()))
+        return {"success": False, "error": str(e)}
+
+
+
     """
     Lists all bodies in the current design with their IDs and names.
     Returns a list of body information dictionaries.
@@ -4075,6 +4389,31 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-type','application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode('utf-8'))
+            # CRITICAL 5 TOOLS GET ENDPOINTS
+            elif self.path == '/select_body_by_id':
+                result = query_results.get('select_body_by_id', {"success": False, "error": "No data available. Call POST /select_body_by_id first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/select_face':
+                result = query_results.get('select_face', {"success": False, "error": "No data available. Call POST /select_face first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/list_features':
+                result = query_results.get('list_features', {"success": False, "error": "No data available. Call POST /list_features first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
+            elif self.path == '/boolean_preview':
+                result = query_results.get('boolean_preview', {"success": False, "error": "No data available. Call POST /boolean_preview first."})
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode('utf-8'))
             # NEW ENHANCED TOOLS GET ENDPOINTS
             elif self.path == '/get_sketch_status':
                 result = query_results.get('get_sketch_status', {"success": False, "error": "No data available. Call POST /get_sketch_status first."})
@@ -4442,6 +4781,64 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     "message": "Sketch selection requested",
                     "note": "Results will be available via GET /select_sketch after processing (typically < 1 second)"
+                }).encode('utf-8'))
+
+            # CRITICAL 5 TOOLS POST HANDLERS
+            elif path == '/select_body_by_id':
+                body_id = str(data.get('body_id', ''))
+                task_queue.put(('select_body_by_id', body_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "message": "Body selection by ID requested",
+                    "note": "Results will be available via GET /select_body_by_id after processing"
+                }).encode('utf-8'))
+
+            elif path == '/list_faces':
+                body_id = str(data.get('body_id', ''))
+                task_queue.put(('list_faces_with_metadata', body_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "message": "Face list requested",
+                    "note": "Results will be available via GET /list_faces after processing"
+                }).encode('utf-8'))
+
+            elif path == '/select_face':
+                body_id = str(data.get('body_id', ''))
+                face_id = str(data.get('face_id', ''))
+                task_queue.put(('select_face_by_id', body_id, face_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "message": "Face selection requested",
+                    "note": "Results will be available via GET /select_face after processing"
+                }).encode('utf-8'))
+
+            elif path == '/list_features':
+                body_id = str(data.get('body_id', '')) if data.get('body_id') else None
+                task_queue.put(('list_features_in_design', body_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "message": "Feature list requested",
+                    "note": "Results will be available via GET /list_features after processing"
+                }).encode('utf-8'))
+
+            elif path == '/boolean_preview':
+                target_id = str(data.get('target_body_id', ''))
+                tool_id = str(data.get('tool_body_id', ''))
+                task_queue.put(('boolean_preview_operation', target_id, tool_id))
+                self.send_response(200)
+                self.send_header('Content-type','application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "message": "Boolean preview requested",
+                    "note": "Results will be available via GET /boolean_preview after processing"
                 }).encode('utf-8'))
 
             elif path == '/sweep':

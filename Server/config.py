@@ -57,6 +57,13 @@ ENDPOINTS = {
     "select_body": f"{BASE_URL}/select_body",
     "select_sketch": f"{BASE_URL}/select_sketch",
 
+    # CRITICAL 5 TOOLS
+    "select_body_by_id": f"{BASE_URL}/select_body_by_id",
+    "list_faces": f"{BASE_URL}/list_faces",
+    "select_face": f"{BASE_URL}/select_face",
+    "list_features": f"{BASE_URL}/list_features",
+    "boolean_preview": f"{BASE_URL}/boolean_preview",
+
     # NEW ENHANCED TOOLS - Phase 1-4
     "get_sketch_status": f"{BASE_URL}/get_sketch_status",
     "list_faces": f"{BASE_URL}/list_faces",

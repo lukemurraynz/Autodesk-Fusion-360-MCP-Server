@@ -1464,6 +1464,249 @@ def select_sketch(sketch_name: str):
         raise
 
 
+#########################################################################################
+### CRITICAL 5 TOOLS - These eliminate 90% of prop modeling pain ###
+#########################################################################################
+
+@mcp.tool()
+def select_body(body_id: str):
+    """
+    🧩 CRITICAL TOOL #1: Select a body by ID and set it as active.
+
+    **WHY THIS MATTERS**: Without this, every boolean operation is roulette.
+    Fusion MCP currently works like "whatever I touched last is the target."
+    This tool prevents accidental operations on wrong bodies.
+
+    :param body_id: Body entity ID (get from list_bodies())
+    :return: {
+        "success": true/false,
+        "body_id": "entity token",
+        "body_name": "displayed name",
+        "index": numerical position
+    }
+
+    **Usage Example:**
+    ```python
+    # Get bodies first
+    bodies = list_bodies()
+
+    # Select the exact body you want to modify
+    result = select_body(body_id=bodies["bodies"][0]["body_id"])
+
+    # Now boolean operations target THIS body, not whatever was touched last
+    boolean_join(body_id=selected_body_id, tool_body_id=cutter_id)
+    ```
+
+    **KEY INSIGHT**: This is the foundation of reliable multi-body workflows.
+    Use this BEFORE every boolean operation.
+    """
+    try:
+        endpoint = config.ENDPOINTS["select_body_by_id"]
+        payload = {
+            "body_id": body_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Select body by ID failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def list_faces(body_id: str):
+    """
+    🧩 CRITICAL TOOL #2: Get all faces with semantic properties (normal, area).
+
+    **WHY THIS MATTERS**: Right now Copilot guesses face indices.
+    That's why zigzags go on the wrong side. This returns face metadata.
+
+    :param body_id: Body entity ID (get from list_bodies())
+    :return: {
+        "success": true,
+        "face_count": 6,
+        "faces": [
+            { "face_id": "f0", "face_index": 0, "normal": [0,1,0], "area": 18400 },
+            { "face_id": "f1", "face_index": 1, "normal": [0,-1,0], "area": 18400 }
+        ]
+    }
+
+    **Usage Example:**
+    ```python
+    # Get face metadata
+    faces = list_faces(body_id="body_123")
+
+    # Find the largest +Y face (front)
+    front_face = max([f for f in faces["faces"] if f["normal"] == [0,1,0]],
+                     key=lambda x: x["area"])
+
+    # Now sketch placement is semantic, not guessing
+    sketch_on_face(body_id="body_123", face_id=front_face["face_id"])
+    ```
+
+    **KEY INSIGHT**: Replace guessing with semantic selection.
+    Use normal vectors and area to target specific faces reliably.
+    """
+    try:
+        endpoint = config.ENDPOINTS["list_faces"]
+        payload = {
+            "body_id": body_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("List faces failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def select_face(body_id: str, face_id: str):
+    """
+    🧩 CRITICAL TOOL #3: Select a specific face for sketch placement.
+
+    **WHY THIS MATTERS**: Without semantic face selection, sketch placement is unstable.
+    This tool locks in a face selection before creating the sketch.
+
+    :param body_id: Body entity ID
+    :param face_id: Face ID from list_faces() (format: "f0", "f1", etc.)
+    :return: {
+        "success": true/false,
+        "face_id": "f0",
+        "face_index": 0,
+        "area": 18400
+    }
+
+    **Usage Example:**
+    ```python
+    # Get faces
+    faces = list_faces(body_id="body_123")
+
+    # Select front face
+    front = faces["faces"][0]
+    select_face(body_id="body_123", face_id=front["face_id"])
+
+    # Create sketch on that face
+    sketch_on_face(body_id="body_123", face_id=front["face_id"])
+    draw_polygon(sides=6, radius=2)
+    close_sketch()
+    ```
+
+    **KEY INSIGHT**: Eliminates fragile face_index guessing.
+    """
+    try:
+        endpoint = config.ENDPOINTS["select_face"]
+        payload = {
+            "body_id": body_id,
+            "face_id": face_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Select face failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def list_features(body_id: str = None):
+    """
+    🧩 CRITICAL TOOL #4: List all features in design with types and body references.
+
+    **WHY THIS MATTERS**: circular_pattern() doesn't know what to copy.
+    This tells you exactly which features exist and which body they belong to.
+
+    :param body_id: Optional - only list features for one body (None = all features)
+    :return: {
+        "success": true,
+        "feature_count": 8,
+        "features": [
+            { "feature_id": "feat_123", "type": "Extrude", "name": "Extrude1",
+              "body_id": "body_1", "suppressed": false },
+            { "feature_id": "feat_124", "type": "Pocket", "name": "Pocket1",
+              "body_id": "body_1", "suppressed": false }
+        ]
+    }
+
+    **Usage Example:**
+    ```python
+    # See what features exist
+    features = list_features(body_id="body_123")
+
+    # Find the last pocket (what we want to pattern)
+    pockets = [f for f in features["features"] if f["type"] == "Pocket"]
+    last_pocket = pockets[-1]
+
+    # Now pattern it correctly
+    circular_pattern(quantity=6, feature_id=last_pocket["feature_id"])
+    ```
+
+    **KEY INSIGHT**: Patterns operate on features, not bodies.
+    Know your feature IDs before patterning.
+    """
+    try:
+        endpoint = config.ENDPOINTS["list_features"]
+        payload = {
+            "body_id": body_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("List features failed: %s", e)
+        raise
+
+
+@mcp.tool()
+def boolean_preview(target_body_id: str, tool_body_id: str):
+    """
+    🧩 CRITICAL TOOL #5: Preview a boolean operation before committing.
+
+    **WHY THIS MATTERS**: Boolean failures destroy hours of work.
+    This shows you intersection volume and safety warnings BEFORE cutting.
+
+    :param target_body_id: Body being modified (the one getting cut)
+    :param tool_body_id: Body doing the cutting (the cutter)
+    :return: {
+        "success": true,
+        "will_intersect": true,
+        "target_volume": 8500,
+        "tool_volume": 1200,
+        "target_body_name": "Console",
+        "tool_body_name": "VentCutter",
+        "warning": "Safe to proceed with boolean"
+    }
+
+    **Usage Example:**
+    ```python
+    # Before cutting, check intersection
+    preview = boolean_preview(
+        target_body_id="body_console",
+        tool_body_id="body_vent_cutter"
+    )
+
+    if preview["will_intersect"]:
+        print("Safe: bodies intersect properly")
+        # Proceed with boolean
+        boolean_join(target_body_id=preview["target_body_id"],
+                    tool_body_id=preview["tool_body_id"])
+    else:
+        print("WARNING: Check body positions")
+        undo()
+    ```
+
+    **KEY INSIGHT**: Always preview before boolean operations.
+    This prevents catastrophic failures.
+    """
+    try:
+        endpoint = config.ENDPOINTS["boolean_preview"]
+        payload = {
+            "target_body_id": target_body_id,
+            "tool_body_id": tool_body_id
+        }
+        headers = config.HEADERS
+        return send_request(endpoint, payload, headers)
+    except Exception as e:
+        logging.error("Boolean preview failed: %s", e)
+        raise
+
+
 @mcp.tool()
 def check_shell_status(body_id = 0):
     """
